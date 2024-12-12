@@ -3,7 +3,7 @@
 # save as a geopackage if geoparquet has issues
 # load geopackage with geopandas
 # start looking at each of the polygons
-from boto3ingest import *
+from ookladatadownload import *
 import geopandas as gpd
 import pandas as pd
 import logging

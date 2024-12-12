@@ -7,7 +7,7 @@ import numpy as np
 from pathlib import Path
 import rasterio
 # importing function from my other file
-from boto3process2 import read_parquet
+from geoparquettogpkg import read_parquet
 from pyquadkey2 import QuadKey
 from affine import Affine
 from rasterio.crs import CRS
