@@ -51,3 +51,5 @@ def download_files():
 # calling the function
 if __name__ == "__main__":
     download_files()
+
+# uv venv my_env

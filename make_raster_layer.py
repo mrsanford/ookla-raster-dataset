@@ -7,7 +7,7 @@ from shapely import wkt
 from shapely.wkt import loads
 import rasterio
 from rasterio.crs import CRS
-from pyquadkey2 import QuadKey
+from pyquadkey2.quadkey import QuadKey
 from affine import Affine
 import logging
 from pathlib import Path
@@ -16,8 +16,11 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 geoparquet_dir = Path('/Users/michellesanford/GitHub/geo-datasets/datasets/ookla_speedtest')
+# creating the iterative loop for the files
+# for file in geoparquet_dir: # picking files based on the time period and type of files you want
 test_parquet_file = '2019-01-01_performance_fixed_tiles.parquet'
 
+# reading the parquet files
 def read_parquet(parquet_path: str):
     if parquet_path.exists():
         logger.info(f'Reading Parquet file: {parquet_path}')
@@ -29,7 +32,7 @@ def read_parquet(parquet_path: str):
     else:
         logger.warning(f'Parquet file not found: {parquet_path}')
         return None
-
+# option to make gpkg files
 def make_geopackage(gdf, output_path):
     if gdf is not None and isinstance(gdf, gpd.GeoDataFrame):
         try:
@@ -39,6 +42,7 @@ def make_geopackage(gdf, output_path):
             logger.error(f'Failed to save GeoPackage: {e}')
     else:
         logger.warning('Invalid GeoDataFrame provided to make_geopackage.')
+# processing the parquet to gpkg file change
 def process_geodata():
     parquet_path = geoparquet_dir / test_parquet_file
     gdf = read_parquet(parquet_path)
@@ -48,16 +52,15 @@ def process_geodata():
         make_geopackage(gdf, output_path)
     else:
         logger.error('Failed to read Parquet data or create GeoDataFrame.')
-
 if __name__ == "__main__":
     process_geodata()
 
 # reading in data
-parquet_data_path = Path('/Users/michellesanford/GitHub/geo-datasets/datasets/ookla_speedtest/2019-01-01_performance_fixed_tiles.parquet')
+parquet_data_path = Path(f'/Users/michellesanford/GitHub/geo-datasets/datasets/ookla_speedtest/{test_parquet_file}')
 parquet_data_path = read_parquet(parquet_data_path)
 # checking data
-print(parquet_data_path.head())
-print(parquet_data_path.columns)
+# print(gpd.parquet_data_path.head())
+# print(parquet_data_path.columns)
 
 # setting zoom level and grid size
 zoom_level = 16
@@ -73,18 +76,18 @@ tests_band = np.empty((grid_size,grid_size))
 devices_band = np.empty((grid_size,grid_size))
 all_bands = np.stack([d_kbps_band,u_kbps_band,lat_ms_band,tests_band,devices_band],axis=0)
 
-# # iterating over the rows
-# for idx, row in parquet_data_path.iterrows():
-#     quadkey = row['quadkey']
-#     x, y = QuadKey.decode(quadkey, zoom_level)
-#     if 0 <= x < grid_size and 0 <= y < grid_size:
-#         for band_idx, band_column in enumerate(band_column_names):
-#             if band_column in row:
-#                 all_bands[band_idx, x, y] = row[band_column]
-#                 # band_arrays[band_idx][x, y] = row[band_column]
-#             else:
-#                 print(f"Missing data for {band_column} at row {idx}")
-# print(all_bands[:, :5, :5])
+# iterating over the rows
+for idx, row in parquet_data_path.iterrows():
+    quadkey = row['quadkey']
+    x, y = QuadKey.decode(quadkey, zoom_level)
+    if 0 <= x < grid_size and 0 <= y < grid_size:
+        for band_idx, band_column in enumerate(band_column_names):
+            if band_column in row:
+                all_bands[band_idx, x, y] = row[band_column]
+                # band_arrays[band_idx][x, y] = row[band_column]
+            else:
+                print(f"Missing data for {band_column} at row {idx}")
+print(all_bands[:, :5, :5])
 
 profile = {
     'driver': 'GTiff',
@@ -93,7 +96,7 @@ profile = {
     'crs': CRS.from_epsg(3857),
     'transform': rasterio.transform.from_origin(0, grid_size, 1, 1),  # You will need to adjust this for your actual bounding box
     'width': grid_size,
-    'height': grid_size,
-}
+    'height': grid_size}
+
 with rasterio.open('ookla_raster.tif','w,',**profile) as dst:
     dst.write(all_bands)
