@@ -37,7 +37,7 @@ def download_files():
     s3_client = create_s3_client()
     formats = ['shapefiles', 'parquet']
     service_types = ['mobile', 'fixed']
-    years = range(2019, 2020)
+    years = range(2019, 2020) # available years from 2019 - 2024
     for year in years:
         for quarter, month in quarters.items():
             for format_type in formats:

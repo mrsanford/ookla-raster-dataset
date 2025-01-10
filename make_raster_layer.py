@@ -17,8 +17,9 @@ logger = logging.getLogger(__name__)
 
 geoparquet_dir = Path('/Users/michellesanford/GitHub/geo-datasets/datasets/ookla_speedtest')
 # creating the iterative loop for the files
-# for file in geoparquet_dir: # picking files based on the time period and type of files you want
 test_parquet_file = '2019-01-01_performance_fixed_tiles.parquet'
+# for parquet_file in geoparquet_dir.glob('*.parquet'):
+#     test_parquet_file = parquet_file
 
 # reading the parquet files
 def read_parquet(geoparquet_dir):
@@ -66,7 +67,8 @@ parquet_data_path = read_parquet(parquet_data_path)
 zoom_level = 16
 grid_size = 2 ** zoom_level
 band_column_names = ['avg_d_kbps','avg_u_kbps','avg_lat_ms','tests','devices']
-num_bands = len(band_column_names)
+num_bands = 2
+# len(band_column_names)
 
 profile = {
     'driver': 'GTiff',
