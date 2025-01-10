@@ -59,9 +59,8 @@ if __name__ == "__main__":
 parquet_data_path = Path(f'/Users/michellesanford/GitHub/geo-datasets/datasets/ookla_speedtest/{test_parquet_file}')
 parquet_data_path = read_parquet(parquet_data_path)
 # checking data
-print(gpd.parquet_data_path.head())
-print(parquet_data_path.columns)
-
+# print(parquet_data_path.head())
+# print(parquet_data_path.columns)
 
 # setting zoom level and grid size
 zoom_level = 16
@@ -81,10 +80,11 @@ profile = {
 # creating the empty band arrays
 d_kbps_band = np.empty((grid_size,grid_size))
 u_kbps_band = np.empty((grid_size,grid_size))
-lat_ms_band = np.empty((grid_size,grid_size))
-tests_band = np.empty((grid_size,grid_size))
-devices_band = np.empty((grid_size,grid_size))
-all_bands = np.stack([d_kbps_band,u_kbps_band,lat_ms_band,tests_band,devices_band],axis=0)
+# lat_ms_band = np.empty((grid_size,grid_size))
+# tests_band = np.empty((grid_size,grid_size))
+# devices_band = np.empty((grid_size,grid_size))
+# lat_ms_band,tests_band,devices_band
+all_bands = np.stack([d_kbps_band,u_kbps_band],axis=0)
 
 # iterating over the rows
 for idx, row in parquet_data_path.iterrows():
@@ -96,7 +96,6 @@ for idx, row in parquet_data_path.iterrows():
                 all_bands[band_idx, x, y] = row[band_column]
             else:
                 print(f"Missing data for {band_column} at row {idx}")
-print(all_bands[:, :5, :5])
-
+print(all_bands[:, :2, :2])
 with rasterio.open('ookla_raster.tif','w,',**profile) as dst:
     dst.write(all_bands)
