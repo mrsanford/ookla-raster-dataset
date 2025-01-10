@@ -21,16 +21,16 @@ geoparquet_dir = Path('/Users/michellesanford/GitHub/geo-datasets/datasets/ookla
 test_parquet_file = '2019-01-01_performance_fixed_tiles.parquet'
 
 # reading the parquet files
-def read_parquet(parquet_path: str):
-    if parquet_path.exists():
-        logger.info(f'Reading Parquet file: {parquet_path}')
-        parquet_data = pd.read_parquet(parquet_path)
+def read_parquet(geoparquet_dir):
+    if geoparquet_dir.exists():
+        logger.info(f'Reading Parquet file: {geoparquet_dir}')
+        parquet_data = pd.read_parquet(geoparquet_dir)
         parquet_data["geometry"] = gpd.GeoSeries.from_wkt(parquet_data["tile"])
         gdf = gpd.GeoDataFrame(parquet_data)
         logger.info(parquet_data.head())
         return gdf
     else:
-        logger.warning(f'Parquet file not found: {parquet_path}')
+        logger.warning(f'Parquet file not found: {geoparquet_dir}')
         return None
 # option to make gpkg files
 def make_geopackage(gdf, output_path):
@@ -53,20 +53,30 @@ def process_geodata():
     else:
         logger.error('Failed to read Parquet data or create GeoDataFrame.')
 if __name__ == "__main__":
-    process_geodata()
+    read_parquet(Path(geoparquet_dir/test_parquet_file))
 
 # reading in data
 parquet_data_path = Path(f'/Users/michellesanford/GitHub/geo-datasets/datasets/ookla_speedtest/{test_parquet_file}')
 parquet_data_path = read_parquet(parquet_data_path)
 # checking data
-# print(gpd.parquet_data_path.head())
-# print(parquet_data_path.columns)
+print(gpd.parquet_data_path.head())
+print(parquet_data_path.columns)
+
 
 # setting zoom level and grid size
 zoom_level = 16
 grid_size = 2 ** zoom_level
 band_column_names = ['avg_d_kbps','avg_u_kbps','avg_lat_ms','tests','devices']
 num_bands = len(band_column_names)
+
+profile = {
+    'driver': 'GTiff',
+    'count': num_bands,
+    'dtype': 'float32',
+    'crs': CRS.from_epsg(3857),
+    'transform': rasterio.transform.from_origin(0, grid_size, 1, 1),  # You will need to adjust this for your actual bounding box
+    'width': grid_size,
+    'height': grid_size}
 
 # creating the empty band arrays
 d_kbps_band = np.empty((grid_size,grid_size))
@@ -84,19 +94,9 @@ for idx, row in parquet_data_path.iterrows():
         for band_idx, band_column in enumerate(band_column_names):
             if band_column in row:
                 all_bands[band_idx, x, y] = row[band_column]
-                # band_arrays[band_idx][x, y] = row[band_column]
             else:
                 print(f"Missing data for {band_column} at row {idx}")
 print(all_bands[:, :5, :5])
-
-profile = {
-    'driver': 'GTiff',
-    'count': num_bands,
-    'dtype': 'float32',
-    'crs': CRS.from_epsg(3857),
-    'transform': rasterio.transform.from_origin(0, grid_size, 1, 1),  # You will need to adjust this for your actual bounding box
-    'width': grid_size,
-    'height': grid_size}
 
 with rasterio.open('ookla_raster.tif','w,',**profile) as dst:
     dst.write(all_bands)
