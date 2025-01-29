@@ -14,15 +14,15 @@ import math
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-geoparquet_dir = Path('/Users/michellesanford/GitHub/geo-datasets/datasets/ookla_speedtest')
-test_parquet_file = '2019-01-01_performance_fixed_tiles.parquet'
+# Constants
+ZOOM_LEVEL = 16
+GRID_SIZE = 2**ZOOM_LEVEL
+BAND_COLUMN_NAME = ['avg_d_kbps','avg_u_kbps','avg_lat_ms','tests','devices']
+NUM_BAND = 5
+GEOPARQUET_DIR = Path('/Users/michellesanford/GitHub/geo-datasets/datasets/ookla_speedtest')
+TEST_PARQUET_FILE = '2019-01-01_performance_fixed_tiles.parquet'
 # for parquet_file in geoparquet_dir.glob('*.parquet'):
 #     test_parquet_file = parquet_file
-
-zoom_level = 16
-grid_size = 2 ** zoom_level
-band_column_names = ['avg_d_kbps','avg_u_kbps','avg_lat_ms','tests','devices']
-num_bands = 5
 
 def read_parquet(geoparquet_dir):
     if geoparquet_dir.exists():
