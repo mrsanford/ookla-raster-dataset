@@ -56,7 +56,7 @@ def make_geopackage(gdf: gpd.GeoDataFrame, output_path: Path):
 
 
 def make_raster_profile(
-    zoom_level: int, grid_size: int = GRID_SIZE, num_bands: int = NUM_BAND
+    zoom_level: int = ZOOM_LEVEL, grid_size: int = GRID_SIZE, num_bands: int = NUM_BAND
 ) -> dict:
     profile = {
         "driver": "GTiff",
@@ -72,11 +72,14 @@ def make_raster_profile(
     return profile
 
 
-def make_raster_bands(grid_size: int, num_bands: int) -> np.ndarray:
+def make_raster_bands(
+    grid_size: int = GRID_SIZE, num_bands: int = NUM_BAND
+) -> np.ndarray:
     return np.empty((num_bands, grid_size, grid_size))
 
 
-def coords_to_tile(lat: float, lon: float, zoom_level: int) -> tuple:
+# its going quadkey to coordinate btw and not the other way around
+def coords_to_tile(lat: float, lon: float, zoom_level: int = ZOOM_LEVEL) -> tuple:
     n = GRID_SIZE
     xtile = int((lon + 180.0) / 360.0 * n)
     ytile = int(
@@ -92,7 +95,10 @@ def coords_to_tile(lat: float, lon: float, zoom_level: int) -> tuple:
 
 
 def process_polygon_data(
-    gdf: gpd.GeoDataFrame, grid_size: int, band_column_names: list, zoom_level: int
+    gdf: gpd.GeoDataFrame,
+    grid_size: int = GRID_SIZE,
+    band_column_names: list = BAND_COLUMN_NAME,
+    zoom_level: int = ZOOM_LEVEL,
 ) -> np.ndarray:
     all_bands = make_raster_bands(grid_size, len(band_column_names))
     for idx, row in gdf.iterrows():
@@ -107,7 +113,6 @@ def process_polygon_data(
     return all_bands
 
 
-# its going quadkey to coordinate btw and not the other way around
 def write_raster(all_bands: np.ndarray, profile: dict, output_path: str):
     try:
         with rasterio.open(output_path, "w", **profile) as dst:
