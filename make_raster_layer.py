@@ -3,14 +3,17 @@ from dataset_download import *
 import numpy as np
 import pandas as pd
 import geopandas as gpd
+from shapely import wkt
+from shapely.wkt import loads
 import rasterio
 from rasterio.crs import CRS
-from rasterio.transform import from_origin
+from pyquadkey2.quadkey import QuadKey
+from affine import Affine
 import logging
 from pathlib import Path
-import mercantile
+import math
 
-# Logging Setup
+# Logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -20,118 +23,110 @@ GRID_SIZE = 2**ZOOM_LEVEL
 BAND_COLUMN_NAME = ["avg_d_kbps", "avg_u_kbps", "avg_lat_ms", "tests", "devices"]
 NUM_BAND = 5
 geoparquet_dir = Path(
-    "/Users/michellesanford/Documents/GitHub/geo-datasets/datasets/ookla_speedtest"
+    "/Users/michellesanford/GitHub/geo-datasets/datasets/ookla_speedtest"
 )
 test_parquet_file = "2019-01-01_performance_fixed_tiles.parquet"
+# for parquet_file in geoparquet_dir.glob('*.parquet'):
+#     test_parquet_file = parquet_file
 
 
-# Function to Read Parquet Data
-def read_parquet(geoparquet_dir, sample_size=1000):
+def read_parquet(geoparquet_dir):
     if geoparquet_dir.exists():
-        logger.info(f"Attempting to read Parquet file at: {geoparquet_dir}")
+        logger.info(f"Reading Parquet file: {geoparquet_dir}")
         parquet_data = pd.read_parquet(geoparquet_dir)
-
-        logger.info(f"Columns in the Parquet file: {parquet_data.columns}")
-        if "tile" in parquet_data.columns:
-            parquet_data = parquet_data.sample(n=sample_size)
-            parquet_data["geometry"] = gpd.GeoSeries.from_wkt(parquet_data["tile"])
-            gdf = gpd.GeoDataFrame(parquet_data)
-            logger.info(
-                f"GeoDataFrame successfully loaded. First few rows:\n{gdf.head()}"
-            )
-            return gdf
-        else:
-            logger.error("Column 'tile' not found in Parquet file.")
-            return None
+        parquet_data["geometry"] = gpd.GeoSeries.from_wkt(parquet_data["tile"])
+        gdf = gpd.GeoDataFrame(parquet_data)
+        logger.info(parquet_data.head())
+        return gdf
     else:
         logger.warning(f"Parquet file not found: {geoparquet_dir}")
         return None
 
 
-# Function to create a raster profile
+# Optional: makes geopackage
+def make_geopackage(gdf: gpd.GeoDataFrame, output_path: Path):
+    try:
+        if gdf is not None and isinstance(gdf, gpd.GeoDataFrame):
+            gdf.to_file(output_path, driver="GPKG")
+            logger.info(f"Saved data as GeoPackage: {output_path}")
+        else:
+            logger.warning("Invalid GeoDataFrame provided to make_geopackage.")
+    except Exception as e:
+        logger.error(f"Failed to save GeoPackage: {e}")
+
+
 def make_raster_profile(
-    gdf: gpd.GeoDataFrame,
-    zoom_level: int = ZOOM_LEVEL,
-    grid_size: int = GRID_SIZE,
-    num_bands: int = NUM_BAND,
+    zoom_level: int = ZOOM_LEVEL, grid_size: int = GRID_SIZE, num_bands: int = NUM_BAND
 ) -> dict:
-    if not isinstance(gdf, gpd.GeoDataFrame):
-        logger.error("Input data is not a GeoDataFrame!")
-        return None
-
-    minx, miny, maxx, maxy = gdf.total_bounds
-    width = int((maxx - minx) / grid_size)
-    height = int((maxy - miny) / grid_size)
-    transform = from_origin(minx, maxy, grid_size, grid_size)
-
     profile = {
         "driver": "GTiff",
         "count": num_bands,
         "dtype": "float32",
         "crs": CRS.from_epsg(3857),
-        "transform": transform,
-        "width": width,
-        "height": height,
+        "transform": rasterio.transform.from_origin(
+            0, 0, grid_size, grid_size
+        ),  # You will need to adjust this for your actual bounding box
+        "width": grid_size,
+        "height": grid_size,
     }
     return profile
 
 
-# Create empty bands
 def make_raster_bands(
     grid_size: int = GRID_SIZE, num_bands: int = NUM_BAND
 ) -> np.ndarray:
     return np.empty((num_bands, grid_size, grid_size))
 
 
-# Function to convert quadkey to XYZ coordinates
-def quadkey_to_xyz(quadkey: str, zoom_level: int = ZOOM_LEVEL) -> tuple:
-    tile = mercantile.quadkey_to_tile(quadkey)
-    # logger.info(f"Quadkey: {quadkey} -> Tile coordinates: {tile}")
-    return tile.x, tile.y
+# its going quadkey to coordinate btw and not the other way around
+def coords_to_tile(lat: float, lon: float, zoom_level: int = ZOOM_LEVEL) -> tuple:
+    n = GRID_SIZE
+    xtile = int((lon + 180.0) / 360.0 * n)
+    ytile = int(
+        (
+            1.0
+            - math.log(math.tan(math.radians(lat)) + 1.0 / math.cos(math.radians(lat)))
+            / math.pi
+        )
+        / 2.0
+        * n
+    )
+    return xtile, ytile
 
 
-# Process polygon data and assign values to raster bands
 def process_polygon_data(
     gdf: gpd.GeoDataFrame,
     grid_size: int = GRID_SIZE,
     band_column_names: list = BAND_COLUMN_NAME,
     zoom_level: int = ZOOM_LEVEL,
 ) -> np.ndarray:
-    minx, miny, maxx, maxy = gdf.total_bounds
     all_bands = make_raster_bands(grid_size, len(band_column_names))
-
     for idx, row in gdf.iterrows():
         quadkey = row["quadkey"]
-        x, y = quadkey_to_xyz(quadkey, zoom_level)
-
-        raster_x = int((x - minx) / grid_size)
-        raster_y = int((y - miny) / grid_size)
-
-        if 0 <= raster_x < grid_size and 0 <= raster_y < grid_size:
+        x, y = QuadKey.to_tile(quadkey)  # removed hyperparameter zoom_level
+        if 0 <= x < grid_size and 0 <= y < grid_size:
             for band_idx, band_column in enumerate(band_column_names):
                 if band_column in row:
-                    all_bands[band_idx, raster_y, raster_x] = row[band_column]
+                    all_bands[band_idx, x, y] = row[band_column]
                 else:
                     logger.warning(f"Missing data for {band_column} at row {idx}")
     return all_bands
 
 
-# Write raster to file
 def write_raster(all_bands: np.ndarray, profile: dict, output_path: str):
     try:
-        with rasterio.open(output_path, "w", **profile, compress="lzw") as dst:
+        with rasterio.open(output_path, "w", **profile) as dst:
             dst.write(all_bands)
         logger.info(f"Raster written to {output_path}")
     except Exception as e:
         logger.error(f"Error writing raster: {e}")
 
 
-# Main function to execute the script
 def main():
     parquet_data_path = geoparquet_dir / test_parquet_file
-    gdf = read_parquet(parquet_data_path, sample_size=1000)
+    gdf = read_parquet(parquet_data_path)
     if gdf is not None:
-        profile = make_raster_profile(gdf, ZOOM_LEVEL, GRID_SIZE, NUM_BAND)
+        profile = make_raster_profile(ZOOM_LEVEL, GRID_SIZE, NUM_BAND)
         all_bands = process_polygon_data(gdf, GRID_SIZE, BAND_COLUMN_NAME, ZOOM_LEVEL)
         write_raster(all_bands, profile, "ookla_raster.tif")
     else:
