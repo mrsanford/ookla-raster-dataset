@@ -16,6 +16,7 @@ import numpy as np
 import pandas as pd
 import geopandas as gpd
 from pathlib import Path
+import matplotlib.pyplot as plt
 import logging
 import rasterio
 from rasterio.crs import CRS
@@ -54,9 +55,9 @@ def read_parquet(geoparquet_dir):
 
 def convert_quadkey_to_tile(quadkey: str, zoom_level: int = ZOOM_LEVEL) -> tuple:
     quadkey_obj = QuadKey(quadkey)
-    x, y = quadkey_obj.tile(zoom_level)
+    x, y = quadkey_obj.tile
     x_idx = x % GRID_SIZE
-    y_idx = y % GRID_SIZE
+    y_idx = GRID_SIZE - 1 - (y % GRID_SIZE)
     return x_idx, y_idx
 
 
@@ -65,7 +66,9 @@ def populate_array(gdf: gpd.GeoDataFrame, band_column_names: list = BAND_COLUMN_
     for idx, row in gdf.iterrows():
         quadkey = row["quadkey"]
         logger.debug(f"Processing quadkey: {quadkey}")
+
         x, y = convert_quadkey_to_tile(quadkey, ZOOM_LEVEL)
+
         for band_column in band_column_names:
             if band_column in row:
                 value = row[band_column]
@@ -116,13 +119,6 @@ def make_raster_profile(
     return profile
 
 
-# unecessary now
-def make_raster_bands(
-    grid_size: int = GRID_SIZE, num_bands: int = NUM_BAND
-) -> np.ndarray:
-    return np.empty((num_bands, grid_size, grid_size))
-
-
 def write_raster(all_bands: np.ndarray, profile: dict, output_path: str):
     try:
         with rasterio.open(output_path, "w", **profile) as dst:
@@ -136,11 +132,19 @@ def main():
     parquet_data_path = geoparquet_dir / test_parquet_file
     gdf = read_parquet(parquet_data_path)
     if gdf is not None:
-        # Update the array with values from the quadkeys
         updated_array = populate_array(gdf, BAND_COLUMN_NAME)
-
-        # Inspect the shape and sample data
         logger.info(f"Updated Array Shape: {updated_array.shape}")
+
+        # Testing some of the array stats
+        print(updated_array[:10, :10])
+        print(updated_array[1000:1010, 1000:1010])
+        print(updated_array[0, :])
+        print(updated_array[:, 0])
+
+        # Array Heatmap
+        plt.imshow(updated_array, cmap="hot", interpolation="nearest")
+        plt.colorbar()
+        plt.show()
         logger.info(f"Sample Data at (x=0, y=0): {updated_array[0, 0]}")
     else:
         logger.error("GeoDataFrame is empty. Cannot process raster.")
