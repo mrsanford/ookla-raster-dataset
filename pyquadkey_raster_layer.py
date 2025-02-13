@@ -1,21 +1,6 @@
-# Imports
-from dataset_download import *
-import numpy as np
-import pandas as pd
-import geopandas as gpd
-from shapely import wkt
-from shapely.wkt import loads
-import rasterio
-from rasterio.crs import CRS
-from pyquadkey2.quadkey import QuadKey
-from affine import Affine
-import logging
-from pathlib import Path
-import math
-
 # go down to one band
 # put everything in np.array
-# do some studying on the np.arraya after the data has loaded
+# do some studying on the np.array after the data has loaded
 # check the discrepancies between quadkey zoom and mercantile zoom
 # how does the quadkey relate to the position in the array
 # for this quadkey, go into the fresh np array and for each of the values
@@ -25,6 +10,18 @@ import math
 # calculate x, y indices for that quadkey
 # array[x][y] = value
 
+# Imports
+from dataset_download import *
+import numpy as np
+import pandas as pd
+import geopandas as gpd
+from pathlib import Path
+import logging
+import rasterio
+from rasterio.crs import CRS
+from pyquadkey2.quadkey import QuadKey
+
+
 # Logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -32,10 +29,10 @@ logger = logging.getLogger(__name__)
 # Constants
 ZOOM_LEVEL = 16
 GRID_SIZE = 2**ZOOM_LEVEL
-BAND_COLUMN_NAME = ["avg_d_kbps", "avg_u_kbps", "avg_lat_ms", "tests", "devices"]
-NUM_BAND = 5
+BAND_COLUMN_NAME = ["avg_d_kbps"]  # "avg_u_kbps", "avg_lat_ms", "tests", "devices"
+NUM_BAND = 1
 geoparquet_dir = Path(
-    "/Users/michellesanford/GitHub/geo-datasets/datasets/ookla_speedtest"
+    "/Users/michellesanford/Documents/GitHub/geo-datasets/datasets/ookla_speedtest"
 )
 test_parquet_file = "2019-01-01_performance_fixed_tiles.parquet"
 # for parquet_file in geoparquet_dir.glob('*.parquet'):
@@ -55,6 +52,40 @@ def read_parquet(geoparquet_dir):
         return None
 
 
+def convert_quadkey_to_tile(quadkey: str, zoom_level: int = ZOOM_LEVEL) -> tuple:
+    quadkey_obj = QuadKey(quadkey)
+    x, y = quadkey_obj.tile(zoom_level)
+    x_idx = x % GRID_SIZE
+    y_idx = y % GRID_SIZE
+    return x_idx, y_idx
+
+
+def populate_array(gdf: gpd.GeoDataFrame, band_column_names: list = BAND_COLUMN_NAME):
+    array_data = np.zeros((GRID_SIZE, GRID_SIZE), dtype=float)
+    for idx, row in gdf.iterrows():
+        quadkey = row["quadkey"]
+        logger.debug(f"Processing quadkey: {quadkey}")
+        x, y = convert_quadkey_to_tile(quadkey, ZOOM_LEVEL)
+        for band_column in band_column_names:
+            if band_column in row:
+                value = row[band_column]
+                array_data[x, y] = value
+            else:
+                logger.warning(f"Missing data for {band_column} at row {idx}")
+                array_data[x, y] = np.nan
+    return array_data
+
+
+def process_polygon_data(
+    gdf: gpd.GeoDataFrame, band_column_names: list = BAND_COLUMN_NAME
+):
+    """Process GeoDataFrame and load data into a numpy array for inspection."""
+    loaded_data_array = populate_array(gdf, band_column_names)
+    logger.info("Loaded data array:")
+    logger.info(loaded_data_array)
+    return loaded_data_array
+
+
 # Optional: makes geopackage
 def make_geopackage(gdf: gpd.GeoDataFrame, output_path: Path):
     try:
@@ -67,6 +98,7 @@ def make_geopackage(gdf: gpd.GeoDataFrame, output_path: Path):
         logger.error(f"Failed to save GeoPackage: {e}")
 
 
+# Raster Making
 def make_raster_profile(
     zoom_level: int = ZOOM_LEVEL, grid_size: int = GRID_SIZE, num_bands: int = NUM_BAND
 ) -> dict:
@@ -84,45 +116,11 @@ def make_raster_profile(
     return profile
 
 
+# unecessary now
 def make_raster_bands(
     grid_size: int = GRID_SIZE, num_bands: int = NUM_BAND
 ) -> np.ndarray:
     return np.empty((num_bands, grid_size, grid_size))
-
-
-# its going quadkey to coordinate btw and not the other way around
-def coords_to_tile(lat: float, lon: float, zoom_level: int = ZOOM_LEVEL) -> tuple:
-    n = GRID_SIZE
-    xtile = int((lon + 180.0) / 360.0 * n)
-    ytile = int(
-        (
-            1.0
-            - math.log(math.tan(math.radians(lat)) + 1.0 / math.cos(math.radians(lat)))
-            / math.pi
-        )
-        / 2.0
-        * n
-    )
-    return xtile, ytile
-
-
-def process_polygon_data(
-    gdf: gpd.GeoDataFrame,
-    grid_size: int = GRID_SIZE,
-    band_column_names: list = BAND_COLUMN_NAME,
-    zoom_level: int = ZOOM_LEVEL,
-) -> np.ndarray:
-    all_bands = make_raster_bands(grid_size, len(band_column_names))
-    for idx, row in gdf.iterrows():
-        quadkey = row["quadkey"]
-        x, y = QuadKey.to_tile(quadkey)  # removed hyperparameter zoom_level
-        if 0 <= x < grid_size and 0 <= y < grid_size:
-            for band_idx, band_column in enumerate(band_column_names):
-                if band_column in row:
-                    all_bands[band_idx, x, y] = row[band_column]
-                else:
-                    logger.warning(f"Missing data for {band_column} at row {idx}")
-    return all_bands
 
 
 def write_raster(all_bands: np.ndarray, profile: dict, output_path: str):
@@ -138,9 +136,12 @@ def main():
     parquet_data_path = geoparquet_dir / test_parquet_file
     gdf = read_parquet(parquet_data_path)
     if gdf is not None:
-        profile = make_raster_profile(ZOOM_LEVEL, GRID_SIZE, NUM_BAND)
-        all_bands = process_polygon_data(gdf, GRID_SIZE, BAND_COLUMN_NAME, ZOOM_LEVEL)
-        write_raster(all_bands, profile, "ookla_raster.tif")
+        # Update the array with values from the quadkeys
+        updated_array = populate_array(gdf, BAND_COLUMN_NAME)
+
+        # Inspect the shape and sample data
+        logger.info(f"Updated Array Shape: {updated_array.shape}")
+        logger.info(f"Sample Data at (x=0, y=0): {updated_array[0, 0]}")
     else:
         logger.error("GeoDataFrame is empty. Cannot process raster.")
 
