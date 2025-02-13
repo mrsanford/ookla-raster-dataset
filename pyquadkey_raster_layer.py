@@ -16,15 +16,17 @@ import numpy as np
 import pandas as pd
 import geopandas as gpd
 from pathlib import Path
-import matplotlib.pyplot as plt
 import logging
+import sys
+from tqdm import tqdm
 import rasterio
 from rasterio.crs import CRS
 from pyquadkey2.quadkey import QuadKey
+# import matplotlib.pyplot as plt
 
 
 # Logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO, stream=sys.stdout)
 logger = logging.getLogger(__name__)
 
 # Constants
@@ -62,31 +64,25 @@ def convert_quadkey_to_tile(quadkey: str, zoom_level: int = ZOOM_LEVEL) -> tuple
 
 
 def populate_array(gdf: gpd.GeoDataFrame, band_column_names: list = BAND_COLUMN_NAME):
-    array_data = np.zeros((GRID_SIZE, GRID_SIZE), dtype=float)
-    for idx, row in gdf.iterrows():
+    array_data = np.empty((GRID_SIZE, GRID_SIZE), dtype=float)
+    for idx, row in tqdm(gdf.iterrows(), total=len(gdf)):
         quadkey = row["quadkey"]
-        logger.debug(f"Processing quadkey: {quadkey}")
+        # print(quadkey)
+        # logger.debug(f"Processing quadkey: {quadkey}")
 
         x, y = convert_quadkey_to_tile(quadkey, ZOOM_LEVEL)
+        # print((f"Calculated (x, y) = ({x}, {y}) for quadkey: {quadkey}"))
+        # logger.debug(f"Calculated (x, y) = ({x}, {y}) for quadkey: {quadkey}")
 
         for band_column in band_column_names:
             if band_column in row:
                 value = row[band_column]
+                logger.debug(f"Putting value {value} to array[{x},{y}]")
                 array_data[x, y] = value
             else:
                 logger.warning(f"Missing data for {band_column} at row {idx}")
                 array_data[x, y] = np.nan
     return array_data
-
-
-def process_polygon_data(
-    gdf: gpd.GeoDataFrame, band_column_names: list = BAND_COLUMN_NAME
-):
-    """Process GeoDataFrame and load data into a numpy array for inspection."""
-    loaded_data_array = populate_array(gdf, band_column_names)
-    logger.info("Loaded data array:")
-    logger.info(loaded_data_array)
-    return loaded_data_array
 
 
 # Optional: makes geopackage
@@ -131,20 +127,22 @@ def write_raster(all_bands: np.ndarray, profile: dict, output_path: str):
 def main():
     parquet_data_path = geoparquet_dir / test_parquet_file
     gdf = read_parquet(parquet_data_path)
+
+    # checking column values
+    print(gdf.columns)
+    d_kbps = gdf.get("avg_d_kbps")
+    print(d_kbps)
+
     if gdf is not None:
         updated_array = populate_array(gdf, BAND_COLUMN_NAME)
-        logger.info(f"Updated Array Shape: {updated_array.shape}")
-
         # Testing some of the array stats
-        print(updated_array[:10, :10])
-        print(updated_array[1000:1010, 1000:1010])
-        print(updated_array[0, :])
-        print(updated_array[:, 0])
+        print(updated_array[15540:15550, 40450:40460])
+        print("break")
 
         # Array Heatmap
-        plt.imshow(updated_array, cmap="hot", interpolation="nearest")
-        plt.colorbar()
-        plt.show()
+        # plt.imshow(updated_array, cmap="hot", interpolation="nearest")
+        # plt.colorbar()
+        # plt.show()
         logger.info(f"Sample Data at (x=0, y=0): {updated_array[0, 0]}")
     else:
         logger.error("GeoDataFrame is empty. Cannot process raster.")
