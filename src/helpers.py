@@ -10,6 +10,7 @@ GEOPARQUET_DIR = Path(
     "/Users/michellesanford/Documents/GitHub/geo-datasets/datasets/ookla_speedtest"
 )
 TEST_PARQUET_FILE = "2019-01-01_performance_fixed_tiles.parquet"
+OUTPUT_FILE = "./visualizations"
 
 # Constants
 ZOOM_LEVEL = 16
