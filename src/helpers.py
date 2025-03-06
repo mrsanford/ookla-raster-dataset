@@ -1,13 +1,15 @@
-# Contains paths, constants, and decorators
-from pathlib import Path
+# Contains paths, constants, and any decorators
 
 # establishing values and directories
 BUCKET_NAME = "ookla-open-data"
 REGION_NAME = "us-west-2"
 LOCAL_DIRECTORY = "/Users/michellesanford/GitHub/geo-datasets/datasets/ookla_speedtest"
 QUARTERS = {1: "01", 2: "04", 3: "07", 4: "10"}
-GEOPARQUET_DIR = Path(
+GEOPARQUET_DIR = (
     "/Users/michellesanford/Documents/GitHub/geo-datasets/datasets/ookla_speedtest"
+)
+RASTER_OUTPUT_DIR = (
+    "/Users/michellesanford/Documents/GitHub/geo-datasets/datasets/ookla_raster_output"
 )
 TEST_PARQUET_FILE = "2019-01-01_performance_fixed_tiles.parquet"
 OUTPUT_FILE = "./visualizations"
