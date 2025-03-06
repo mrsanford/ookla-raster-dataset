@@ -1,8 +1,16 @@
-from src.helpers import GEOPARQUET_DIR, TEST_PARQUET_FILE, BAND_COLUMN_NAME
+from src.helpers import (
+    GEOPARQUET_DIR,
+    TEST_PARQUET_FILE,
+    BAND_COLUMN_NAME,
+    RASTER_OUTPUT_DIR,
+)
+
+# from src.dataset_download import download_files
 from src.convert_populate import read_parquet, populate_array
 from src.make_raster import make_raster_profile, write_raster
 import logging
 import sys
+import os
 
 # Logging setup
 logging.basicConfig(level=logging.INFO, stream=sys.stdout)
@@ -14,8 +22,10 @@ def main():
     Main function to process a GeoParquet file, convert to numpy array, and write to raster.
     """
     try:
-        parquet_data_path = GEOPARQUET_DIR / TEST_PARQUET_FILE
-        output_raster_path = GEOPARQUET_DIR / "ookla_raster_output.tif"
+        # download_files() <- This works but not trying to continue letting it run
+
+        parquet_data_path = os.path.join(GEOPARQUET_DIR, TEST_PARQUET_FILE)
+        output_raster_path = os.path.join(RASTER_OUTPUT_DIR, "avg_u_kbps_raster.tif")
 
         logger.info(f"Reading parquet file: {parquet_data_path}")
         gdf = read_parquet(parquet_data_path)
