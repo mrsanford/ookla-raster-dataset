@@ -1,19 +1,5 @@
-# go down to one band
-# put everything in np.array
-# do some studying on the np.array after the data has loaded
-# check the discrepancies between quadkey zoom and mercantile zoom
-# how does the quadkey relate to the position in the array
-# for this quadkey, go into the fresh np array and for each of the values
-# putting their corresponding data values into the correct index
-# for quadkeys and their mappings you
-# for value, key in quadkeys:
-# calculate x, y indices for that quadkey
-# array[x][y] = value
-
-# Imports
 from src.helpers import (
     GEOPARQUET_DIR,
-    ZOOM_LEVEL,
     GRID_SIZE,
     BAND_COLUMN_NAME,
     NUM_BAND,
@@ -24,35 +10,50 @@ import pandas as pd
 import geopandas as gpd
 import logging
 import sys
+from pathlib import Path
 from tqdm import tqdm
 from pyquadkey2.quadkey import QuadKey
-# import matplotlib.pyplot as plt
+from typing import List
 
 # Logging
 logging.basicConfig(level=logging.INFO, stream=sys.stdout)
 logger = logging.getLogger(__name__)
 
 
-def parquet_iterate() -> None:
+def parquet_iterate(file_name: str = TEST_PARQUET_FILE) -> None:
     for parquet_file in GEOPARQUET_DIR.glob("*.parquet"):
-        TEST_PARQUET_FILE = parquet_file
+        logger.info(f"Processing file: {parquet_file}")
+        # Logic for reading parquet_file
     return None
 
 
-def read_parquet(GEOPARQUET_DIR):
-    if GEOPARQUET_DIR.exists():
-        logger.info(f"Reading Parquet file: {GEOPARQUET_DIR}")
-        parquet_data = pd.read_parquet(GEOPARQUET_DIR)
+def read_parquet(parquet_file: str) -> gpd.GeoDataFrame:
+    """
+    Reads the Parquet file and converts the 'tile' column into a geometry column
+    and creates a GeoDataFrame
+    ----
+    Args: parquet_file (str) is the path to the parquet file
+    Returns: gpd.GeoDataFrame or nothing if the parquet file isn't found
+    """
+    if Path(parquet_file).exists():
+        logger.info(f"Reading Parquet file: {parquet_file}")
+        parquet_data = pd.read_parquet(parquet_file)
         parquet_data["geometry"] = gpd.GeoSeries.from_wkt(parquet_data["tile"])
         gdf = gpd.GeoDataFrame(parquet_data)
         logger.info(parquet_data.head())
         return gdf
     else:
-        logger.warning(f"Parquet file not found: {GEOPARQUET_DIR}")
+        logger.warning(f"Parquet file not found: {parquet_file}")
         return None
 
 
-def convert_quadkey_to_tile(quadkey: str, zoom_level: int = ZOOM_LEVEL) -> tuple:
+def quadkey_to_tile(quadkey: str) -> tuple:
+    """
+    Converts a quadkey to grid coordinates (x,y) adjusted based on GRID_SIZE
+    ----
+    Args: quadkey (str) is the quadkey to convert
+    Returns: tuple[int, int] represent the (x,y) coordinates within the grid
+    """
     quadkey_obj = QuadKey(quadkey)
     x, y = quadkey_obj.tile
     x_idx = x % GRID_SIZE
@@ -60,21 +61,28 @@ def convert_quadkey_to_tile(quadkey: str, zoom_level: int = ZOOM_LEVEL) -> tuple
     return x_idx, y_idx
 
 
-def populate_array(gdf: gpd.GeoDataFrame, band_column_names: list = BAND_COLUMN_NAME):
+def populate_array(
+    gdf: gpd.GeoDataFrame, band_column_names: List[str] = BAND_COLUMN_NAME
+) -> np.ndarray:
+    """
+    Populates a 3D numpy array with the band data from the GeoDataFrame.
+    The spatial positions within the array have been determined by the quadkeys.
+    ----
+    Args:
+    gdf (gpd.GeoDataFrame) is the GeoDataFrame with the spatial data per band
+    band_column_names (List[str]) is the list of column names representing bands to extract
+    Returns:
+    np.ndarray of the shape (NUM_BAND, GRID_SIZE, GRID_SIZE) placed based on the
+    spatial positions (via quadkey)
+    """
     array_data = np.full((NUM_BAND, GRID_SIZE, GRID_SIZE), np.nan, dtype=float)
     for idx, row in tqdm(gdf.iterrows(), total=len(gdf)):
-        quadkey = row["quadkey"]
-        # print(quadkey)
-        # logger.debug(f"Processing quadkey: {quadkey}")
-        x, y = convert_quadkey_to_tile(quadkey, ZOOM_LEVEL)
-        # print((f"Calculated (x, y) = ({x}, {y}) for quadkey: {quadkey}"))
-        # logger.debug(f"Calculated (x, y) = ({x}, {y}) for quadkey: {quadkey}")
-        for band_idx, band_column in enumerate(band_column_names):
-            if band_column in row:
-                value = row[band_column]
-                logger.debug(f"Putting value {value} to array[{x},{y}]")
+        try:
+            quadkey = row["quadkey"]
+            x, y = quadkey_to_tile(quadkey)
+            for band_idx, band_column in enumerate(band_column_names):
+                value = row.get(band_column, np.nan)
                 array_data[band_idx, x, y] = value
-            else:
-                logger.warning(f"Missing data for {band_column} at row {idx}")
-                array_data[band_idx, x, y] = np.nan
+        except Exception as e:
+            logger.error(f"Error processing row {idx}: {e}")
     return array_data
