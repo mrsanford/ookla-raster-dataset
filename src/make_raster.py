@@ -1,4 +1,5 @@
 from src.helpers import GRID_SIZE, NUM_BAND, OUTPUT_FILE
+from rasterio.transform import Affine
 from rasterio.crs import CRS
 import rasterio
 import numpy as np
@@ -30,7 +31,8 @@ def make_raster_profile(
         "count": num_bands,
         "dtype": "float32",
         "crs": CRS.from_epsg(3857),
-        "transform": rasterio.transform.from_origin(0, 0, grid_size, grid_size),
+        "transform": Affine.translation(0, 0) * Affine.scale(1, -1),
+        # "transform": rasterio.transform.from_origin(0, 0, grid_size, grid_size),
         "width": grid_size,
         "height": grid_size,
     }
@@ -49,7 +51,7 @@ def write_raster(
         output_path (str) is the path for the output raster file
     """
     try:
-        if len(all_bands.shape) != 5:
+        if len(all_bands.shape) != 3:
             logger.warning(
                 f"Expected 3D array (bands, height, width), but got shape {all_bands.shape}."
             )
