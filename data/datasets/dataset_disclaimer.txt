@@ -1,0 +1,5 @@
+This is a disclaimer because I can't put the botocore S3
+bucket data in this repository because it exceeds the
+storage allowances so just note that when you clone
+the repository, your data from the S3 buckets will be
+stored in this file
