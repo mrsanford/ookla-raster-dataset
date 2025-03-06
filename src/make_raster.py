@@ -49,7 +49,7 @@ def write_raster(
         output_path (str) is the path for the output raster file
     """
     try:
-        if len(all_bands.shape) != 3:
+        if len(all_bands.shape) != 5:
             logger.warning(
                 f"Expected 3D array (bands, height, width), but got shape {all_bands.shape}."
             )

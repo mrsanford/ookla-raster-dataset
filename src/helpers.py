@@ -21,6 +21,5 @@ OUTPUT_FILE = os.path.join(RASTER_OUTPUT_DIR, TEST_PARQUET_FILE)
 # Raster Processing Constants
 ZOOM_LEVEL = 2
 GRID_SIZE = 2**ZOOM_LEVEL
-BAND_COLUMN_NAME = ["avg_u_kbps"]
-# Options: "avg_lat_ms", "tests", "devices", "avg_d_kbps"
-NUM_BAND = 1
+BAND_COLUMN_NAME = ["avg_d_kbps", "avg_u_kbps", "avg_lat_ms", "tests", "devices"]
+NUM_BAND = 5
