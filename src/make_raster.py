@@ -20,6 +20,9 @@ def make_raster_profile(
 ) -> Dict[str, object]:
     """
     Creates the raster profiile (metadata dictionary) for writing the GeoTIFF raster file
+        Note: the tiles need to stretch across the entire bounds; the tiff needs to fit
+        the entire bounds of the coordinate reference system
+        i.e. rasterio needs to be told that a 4x4 raster size ≠ 4x4 coordinates in the crs space
     ---
     Args:
         grid_size (int) is the size of the raster grid (width x height) and default is based
@@ -40,13 +43,6 @@ def make_raster_profile(
         "height": grid_size,
     }
     return profile
-
-
-# need to change the transformation
-# the tiles need to stretch across the entire bounds; the tiff needs to fit the entire world
-# the actual width and height of the raster
-# but tell rasterio that the 4x4 raster size is NOT 4x4 coordinates in the crs space
-# changing the number of coordinates within each box
 
 
 def write_raster(
