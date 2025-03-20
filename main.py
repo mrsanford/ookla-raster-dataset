@@ -18,14 +18,11 @@ logger = logging.getLogger(__name__)
 
 
 def main():
-    """
-    Main function to process a GeoParquet file, convert to numpy array, and write to raster.
-    """
     try:
         # download_files() <- This works but not trying to continue letting it run
 
         parquet_data_path = os.path.join(GEOPARQUET_DIR, TEST_PARQUET_FILE)
-        output_raster_path = os.path.join(RASTER_OUTPUT_DIR, "total_band_raster.tif")
+        output_raster_path = os.path.join(RASTER_OUTPUT_DIR, "total_band_raster_16.tif")
 
         logger.info(f"Reading parquet file: {parquet_data_path}")
         gdf = read_parquet(parquet_data_path)

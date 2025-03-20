@@ -1,11 +1,11 @@
-from src.helpers import GRID_SIZE, NUM_BAND, OUTPUT_FILE
-from rasterio.transform import Affine
+from src.helpers import GRID_SIZE, NUM_BAND, OUTPUT_FILE, MAP_BOUNDS
+from rasterio.transform import from_bounds
 from rasterio.crs import CRS
 import rasterio
 import numpy as np
 import logging
 import sys
-from typing import Dict
+from typing import Dict, Tuple
 
 # instantiating the logging
 logging.basicConfig(level=logging.INFO, stream=sys.stdout)
@@ -14,7 +14,9 @@ logger = logging.getLogger(__name__)
 
 # Raster Making
 def make_raster_profile(
-    grid_size: int = GRID_SIZE, num_bands: int = NUM_BAND
+    grid_size: int = GRID_SIZE,
+    num_bands: int = NUM_BAND,
+    bounds: Tuple[float, float, float, float] = MAP_BOUNDS,
 ) -> Dict[str, object]:
     """
     Creates the raster profiile (metadata dictionary) for writing the GeoTIFF raster file
@@ -26,17 +28,25 @@ def make_raster_profile(
     Returns:
         Dict[str, object]
     """
+    left, bottom, right, top = bounds
+    transform = from_bounds(left, bottom, right, top, grid_size, grid_size)
     profile = {
         "driver": "GTiff",
         "count": num_bands,
         "dtype": "float32",
         "crs": CRS.from_epsg(3857),
-        "transform": Affine.translation(0, 0) * Affine.scale(1, -1),
-        # "transform": rasterio.transform.from_origin(0, 0, grid_size, grid_size),
+        "transform": transform,
         "width": grid_size,
         "height": grid_size,
     }
     return profile
+
+
+# need to change the transformation
+# the tiles need to stretch across the entire bounds; the tiff needs to fit the entire world
+# the actual width and height of the raster
+# but tell rasterio that the 4x4 raster size is NOT 4x4 coordinates in the crs space
+# changing the number of coordinates within each box
 
 
 def write_raster(
@@ -49,6 +59,7 @@ def write_raster(
         all_bands (np.ndarray) is the 3D array; size is (num_bands, height, width)
         profile (Dict[str,object]) is the raster profile
         output_path (str) is the path for the output raster file
+    Returns None
     """
     try:
         if len(all_bands.shape) != 3:
