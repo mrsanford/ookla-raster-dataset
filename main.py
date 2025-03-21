@@ -22,7 +22,7 @@ def main():
         # download_files() <- This works but not trying to continue letting it run
 
         parquet_data_path = os.path.join(GEOPARQUET_DIR, TEST_PARQUET_FILE)
-        output_raster_path = os.path.join(RASTER_OUTPUT_DIR, "total_band_raster_13.tif")
+        output_raster_path = os.path.join(RASTER_OUTPUT_DIR, "total_band_raster_10.tif")
 
         logger.info(f"Reading parquet file: {parquet_data_path}")
         gdf = read_parquet(parquet_data_path)
