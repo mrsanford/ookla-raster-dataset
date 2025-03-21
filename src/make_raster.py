@@ -1,38 +1,61 @@
 from src.helpers import GRID_SIZE, NUM_BAND, OUTPUT_FILE, MAP_BOUNDS
-from rasterio.transform import from_bounds
+from rasterio.transform import Affine, from_bounds
 from rasterio.crs import CRS
+import mercantile
 import rasterio
 import numpy as np
 import logging
 import sys
-from typing import Dict, Tuple
+from typing import Dict
 
 # instantiating the logging
 logging.basicConfig(level=logging.INFO, stream=sys.stdout)
 logger = logging.getLogger(__name__)
 
 
-# Raster Making
-def make_raster_profile(
-    grid_size: int = GRID_SIZE,
-    num_bands: int = NUM_BAND,
-    bounds: Tuple[float, float, float, float] = MAP_BOUNDS,
-) -> Dict[str, object]:
+def transform_calc(
+    tile_x: int, tile_y: int, zoom: int, grid_size: int = GRID_SIZE
+) -> Affine:
     """
-    Creates the raster profiile (metadata dictionary) for writing the GeoTIFF raster file
-        Note: the tiles need to stretch across the entire bounds; the tiff needs to fit
-        the entire bounds of the coordinate reference system
-        i.e. rasterio needs to be told that a 4x4 raster size ≠ 4x4 coordinates in the crs space
+    Use an Affine transformation matrix and snaps the raster to Web Mercator tile boundaries.
     ---
     Args:
-        grid_size (int) is the size of the raster grid (width x height) and default is based
-            on ZOOM_SIZE = 16
-        num_bands (int) is the number of bands (layers) in the raster
+        tile_x (int): tile x-coordinate
+        tile_y (int): tile y-coordinate
+        zoom (int): zoom level
+        grid_size (int): raster grid size (width x height)
     Returns:
-        Dict[str, object]
+        Affine: the Affine transformation matrix
     """
-    left, bottom, right, top = bounds
+    left, bottom, right, top = mercantile.xy_bounds(tile_x, tile_y, zoom)
+    # computes exact pixel size to fit the tile
+    pixel_size_x = (right - left) / grid_size
+    pixel_size_y = (top - bottom) / grid_size  # positive for bottom-left origin
+    # ensures the raster starts at the correct tile origin
+    transform = Affine.translation(left, bottom) * Affine.scale(
+        pixel_size_x, pixel_size_y
+    )
+    return transform
+
+
+def make_raster_profile(
+    num_bands: int = NUM_BAND, grid_size: int = GRID_SIZE
+) -> Dict[str, object]:
+    """
+    Creates the raster profile for writing a GeoTIFF raster file.
+    This ensures the raster stretches across the entire EPSG:3857 coordinate space.
+    ---
+    Args:
+        grid_size (int): Raster grid size (width x height).
+        num_bands (int): Number of raster bands.
+    Returns:
+        Dict[str, object]: Raster metadata profile.
+    """
+    left, bottom, right, top = MAP_BOUNDS
+
+    # Stretch raster to fit entire Web Mercator bounds
     transform = from_bounds(left, bottom, right, top, grid_size, grid_size)
+
     profile = {
         "driver": "GTiff",
         "count": num_bands,

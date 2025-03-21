@@ -19,7 +19,7 @@ TEST_PARQUET_FILE = "2019-01-01_performance_fixed_tiles.parquet"
 OUTPUT_FILE = os.path.join(RASTER_OUTPUT_DIR, TEST_PARQUET_FILE)
 
 # Raster Processing Constants
-ZOOM_LEVEL = 15
+ZOOM_LEVEL = 10
 GRID_SIZE = 2**ZOOM_LEVEL
 BAND_COLUMN_NAME = ["avg_d_kbps", "avg_u_kbps", "avg_lat_ms", "tests", "devices"]
 NUM_BAND = 5
