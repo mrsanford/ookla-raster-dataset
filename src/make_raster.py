@@ -28,12 +28,11 @@ def transform_calc(
         Affine: the Affine transformation matrix
     """
     left, bottom, right, top = mercantile.xy_bounds(tile_x, tile_y, zoom)
-    # computes exact pixel size to fit the tile
     pixel_size_x = (right - left) / grid_size
-    pixel_size_y = (top - bottom) / grid_size  # positive for bottom-left origin
-    # ensures the raster starts at the correct tile origin
-    transform = Affine.translation(left, bottom) * Affine.scale(
-        pixel_size_x, pixel_size_y
+    pixel_size_y = (top - bottom) / grid_size
+    # ensures raster starts at the correct tile origin
+    transform = Affine.translation(left, top) * Affine.scale(
+        pixel_size_x, -pixel_size_y
     )
     return transform
 
