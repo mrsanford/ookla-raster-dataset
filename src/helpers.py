@@ -23,8 +23,8 @@ OUTPUT_RASTER_FILE = os.path.join(
 # Raster Processing Constants
 ZOOM_LEVEL = 16
 GRID_SIZE = 2**ZOOM_LEVEL
-BAND_COLUMN_NAME = ["avg_d_kbps", "avg_u_kbps", "avg_lat_ms", "tests", "devices"]
-NUM_BAND = 1
+BAND_COLUMN_NAMES = ["avg_d_kbps", "avg_u_kbps"]  # "avg_lat_ms", "tests", "devices"]
+NUM_BAND = 2
 # For EPSG 3857
 MAP_BOUNDS = (
     -20037508.342789244,

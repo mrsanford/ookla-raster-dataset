@@ -1,7 +1,7 @@
 from src.helpers import (
     GEOPARQUET_DIR,
     GRID_SIZE,
-    BAND_COLUMN_NAME,
+    BAND_COLUMN_NAMES,
     NUM_BAND,
     TEST_PARQUET_FILE,
 )
@@ -20,11 +20,8 @@ logging.basicConfig(level=logging.INFO, stream=sys.stdout)
 logger = logging.getLogger(__name__)
 
 
-def parquet_iterate(file_name: str = TEST_PARQUET_FILE) -> None:
-    for parquet_file in GEOPARQUET_DIR.glob("*.parquet"):
-        logger.info(f"Processing file: {parquet_file}")
-        # Logic for reading parquet_file
-    return None
+def iterate_parquet_files() -> List[Path]:
+    return list(GEOPARQUET_DIR.glob("*.parquet"))
 
 
 def read_parquet(parquet_file: str) -> gpd.GeoDataFrame:
@@ -40,7 +37,6 @@ def read_parquet(parquet_file: str) -> gpd.GeoDataFrame:
         parquet_data = pd.read_parquet(parquet_file)
         parquet_data["geometry"] = gpd.GeoSeries.from_wkt(parquet_data["tile"])
         gdf = gpd.GeoDataFrame(parquet_data)
-        print(gdf.crs)
         logger.info(gdf.head())
         return gdf
     else:
@@ -48,7 +44,7 @@ def read_parquet(parquet_file: str) -> gpd.GeoDataFrame:
         return None
 
 
-def quadkey_to_tile(quadkey: str) -> tuple:
+def quadkey_to_tile(quadkey: str) -> tuple[int, int]:
     """
     Converts a quadkey to grid coordinates (x,y) adjusted based on GRID_SIZE
     ----
@@ -62,7 +58,9 @@ def quadkey_to_tile(quadkey: str) -> tuple:
     return x_idx, y_idx
 
 
-def create_band_array(gdf: gpd.GeoDataFrame, band_column: str) -> np.ndarray:
+def create_band_array(
+    gdf: gpd.GeoDataFrame, band_column: str, dtype=np.float32
+) -> np.ndarray:
     """
     Creates a single band array for a given column name with respective data from the DataFrame
     ----
@@ -72,23 +70,33 @@ def create_band_array(gdf: gpd.GeoDataFrame, band_column: str) -> np.ndarray:
     Returns:
         np.ndarray: 2D array of shape (GRID_SIZE, GRID_SIZE)
     """
-    band_array = np.full((GRID_SIZE, GRID_SIZE), np.nan, dtype=np.float32)
+    band_array = np.full((GRID_SIZE, GRID_SIZE), np.nan, dtype=dtype)
     for idx, row in tqdm(gdf.iterrows(), total=len(gdf)):
         try:
             quadkey = row["quadkey"]
             x, y = quadkey_to_tile(quadkey)
             value = row.get(band_column, np.nan)
             band_array[y, x] = value
+
         except Exception as e:
             logger.error(f"Error processing row {idx} for band '{band_column}': {e}")
+    logger.info(f"Success loading {band_column} data into array")
     return band_array
 
 
+# fit most of the values in 16 or 32 bit integer
+# potentially make separate np.arrays for each band and then just overlay them later
+## we can pick which size of integer for each
+# opt out of user functionality for picking band size or whichever
+# be able to write a single array to the raster and be able to delete the array
+# if done with variable del() command will delete from memory; if no longer using, will delete manually/force delete i.e. geodataframe after loading
+
+
 def stack_band_arrays(
-    gdf: gpd.GeoDataFrame, band_columns: List[str] = BAND_COLUMN_NAME
+    gdf: gpd.GeoDataFrame, band_columns: List[str] = BAND_COLUMN_NAMES
 ) -> np.ndarray:
     """
-    Stacks individula band arrays into a 3D array
+    Stacks individual band arrays into a 3D array
     ----
     Args:
         gdf (GeoDataFrame): input geospatial data
@@ -100,32 +108,7 @@ def stack_band_arrays(
     for column in band_columns:
         logger.info(f"Creating band for column: {column}")
         band_array = create_band_array(gdf, column)
+        breakpoint()
         band_arrays.append(band_array)
+        breakpoint()
     return np.stack(band_arrays, axis=0)
-
-
-# fit most of the values in 16 or 32 bit integer
-# potentially make separate np.arrays for each band and then just overlay them later
-## we can pick which size of integer for each
-# opt out of user functionality for picking band size or whichever
-# be able to write a single array to the raster and be able to delete the array
-# if done with variable del() command will delete from memory; if no longer using, will delete manually/force delete i.e. geodataframe after loading
-
-# def populate_array(
-#     gdf: gpd.GeoDataFrame, band_column_names: List[str] = BAND_COLUMN_NAME
-# ) -> np.ndarray:
-#     """
-#     Builds each band array individually with optimal dtype (uint32 or uint16),
-#     and returns the stacked 3D array with original dtypes preserved.
-#     """
-#     array_data = np.full((NUM_BAND, GRID_SIZE, GRID_SIZE), np.nan, dtype=np.uint32)
-#     for idx, row in tqdm(gdf.iterrows(), total=len(gdf)):
-#         try:
-#             quadkey = row["quadkey"]
-#             x, y = quadkey_to_tile(quadkey)
-#             for band_idx, band_column in enumerate(band_column_names):
-#                 value = row.get(band_column, 0)
-#                 array_data[band_idx, x, y] = int(value) if not pd.isnull(value) else 0
-#         except Exception as e:
-#             logger.error(f"Error processing row {idx}: {e}")
-#     return array_data
