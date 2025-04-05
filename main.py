@@ -1,55 +1,57 @@
 from src.helpers import (
     GEOPARQUET_DIR,
+    GRID_SIZE,
     TEST_PARQUET_FILE,
-    BAND_COLUMN_NAME,
-    RASTER_OUTPUT_DIR,
+    OUTPUT_RASTER_FILE,
 )
-
-# from src.dataset_download import download_files
-from src.convert_populate import read_parquet, populate_array
-from src.make_raster import make_raster_profile, write_raster
-import logging
+from src.transform_populate import read_parquet, create_band_array
+from src.generate_raster import (
+    make_raster_profile,
+    write_single_band_raster,
+)
 import sys
 import os
+import numpy as np
+import logging
 
 # Logging setup
 logging.basicConfig(level=logging.INFO, stream=sys.stdout)
 logger = logging.getLogger(__name__)
 
 
-def main():
-    try:
-        # download_files() <- This works but not trying to continue letting it run
+def parquet_to_raster(
+    parquet_path: str = os.path.join(GEOPARQUET_DIR, TEST_PARQUET_FILE),
+    output_path: str = OUTPUT_RASTER_FILE,
+) -> None:
+    """
+    Full pipeline: reads parquet -> builds array -> writes raster -> clears memory
+    """
+    # 1. Load GeoDataFrame
+    parquet_path = os.path.join(GEOPARQUET_DIR, TEST_PARQUET_FILE)
+    gdf = read_parquet(parquet_path)
+    if gdf is None:
+        logger.error("GeoDataFrame loading failed. Aborting raster generation.")
+        return
+    # building single array
+    band_array = create_band_array(gdf, "avg_u_kbps")
 
-        parquet_data_path = os.path.join(GEOPARQUET_DIR, TEST_PARQUET_FILE)
-        output_raster_path = os.path.join(RASTER_OUTPUT_DIR, "total_band_raster_10.tif")
+    # # 2. Build uint32 array
+    # array_data = populate_array(gdf)
 
-        logger.info(f"Reading parquet file: {parquet_data_path}")
-        gdf = read_parquet(parquet_data_path)
-        if gdf is None or gdf.empty:
-            logger.error("GeoDataFrame is empty or could not be loaded.")
-            return
-        logger.info("GeoDataFrame successfully loaded.")
+    # 3. Create raster profile (uint32-compatible)
+    profile = make_raster_profile(num_bands=band_array.shape[0], grid_size=GRID_SIZE)
 
-        array_data = populate_array(gdf, BAND_COLUMN_NAME)
+    # 4. Write the raster to disk
+    flipped_array = np.flipud(band_array)
+    write_single_band_raster(flipped_array, profile)
+    # write_raster(band_array, profile, output_path=output_path)
 
-        logger.info(f"Array populated with shape: {array_data.shape}")
+    # 5. Cleanup memory
+    # del gdf, array_data
+    # gc.collect()
 
-        profile = make_raster_profile()
-        expected_shape = (profile["count"], profile["height"], profile["width"])
-        if array_data.shape != expected_shape:
-            logger.warning(
-                f"Array shape {array_data.shape} does not match expected profile shape {expected_shape}."
-            )
-
-        logger.info(f"Writing raster to: {output_raster_path}")
-        write_raster(array_data, profile, str(output_raster_path))
-
-        logger.info("Raster creation process completed successfully.")
-
-    except Exception as e:
-        logger.exception(f"Unhandled error in main process: {e}")
+    logger.info("Raster pipeline complete.")
 
 
 if __name__ == "__main__":
-    main()
+    parquet_to_raster()

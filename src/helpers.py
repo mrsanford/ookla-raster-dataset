@@ -16,12 +16,19 @@ os.makedirs(RASTER_OUTPUT_DIR, exist_ok=True)
 
 # Other Constants
 TEST_PARQUET_FILE = "2019-01-01_performance_fixed_tiles.parquet"
-OUTPUT_FILE = os.path.join(RASTER_OUTPUT_DIR, TEST_PARQUET_FILE)
+OUTPUT_RASTER_FILE = os.path.join(
+    RASTER_OUTPUT_DIR, TEST_PARQUET_FILE.replace(".parquet", ".tif")
+)
 
 # Raster Processing Constants
-ZOOM_LEVEL = 10
+ZOOM_LEVEL = 16
 GRID_SIZE = 2**ZOOM_LEVEL
 BAND_COLUMN_NAME = ["avg_d_kbps", "avg_u_kbps", "avg_lat_ms", "tests", "devices"]
-NUM_BAND = 5
+NUM_BAND = 1
 # For EPSG 3857
-MAP_BOUNDS = (-20037508.34, -20037508.34, 20037508.34, 20037508.34)
+MAP_BOUNDS = (
+    -20037508.342789244,
+    -20037508.342789244,
+    20037508.342789244,
+    20037508.342789244,
+)
