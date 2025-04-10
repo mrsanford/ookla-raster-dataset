@@ -2,8 +2,7 @@ from src.helpers import (
     GEOPARQUET_DIR,
     GRID_SIZE,
     BAND_COLUMN_NAMES,
-    NUM_BAND,
-    TEST_PARQUET_FILE,
+    BAND_DTYPES,
 )
 import numpy as np
 import pandas as pd
@@ -70,14 +69,14 @@ def create_band_array(
     Returns:
         np.ndarray: 2D array of shape (GRID_SIZE, GRID_SIZE)
     """
-    band_array = np.full((GRID_SIZE, GRID_SIZE), np.nan, dtype=dtype)
-    for idx, row in tqdm(gdf.iterrows(), total=len(gdf)):
+    band_array = np.full((GRID_SIZE, GRID_SIZE), 0, dtype=dtype)
+    for idx in range(len(gdf)):  # opted out of tqdm()
         try:
+            row = gdf.iloc[idx]
             quadkey = row["quadkey"]
             x, y = quadkey_to_tile(quadkey)
             value = row.get(band_column, np.nan)
             band_array[y, x] = value
-
         except Exception as e:
             logger.error(f"Error processing row {idx} for band '{band_column}': {e}")
     logger.info(f"Success loading {band_column} data into array")
@@ -93,7 +92,9 @@ def create_band_array(
 
 
 def stack_band_arrays(
-    gdf: gpd.GeoDataFrame, band_columns: List[str] = BAND_COLUMN_NAMES
+    gdf: gpd.GeoDataFrame,
+    band_columns: List[str] = BAND_COLUMN_NAMES,
+    dtype_map: dict = BAND_DTYPES,
 ) -> np.ndarray:
     """
     Stacks individual band arrays into a 3D array
@@ -107,8 +108,8 @@ def stack_band_arrays(
     band_arrays = []
     for column in band_columns:
         logger.info(f"Creating band for column: {column}")
-        band_array = create_band_array(gdf, column)
-        breakpoint()
+        dtype = dtype_map.get(column, np.uint16)
+        band_array = create_band_array(gdf, column, dtype=dtype)
         band_arrays.append(band_array)
-        breakpoint()
+        logger.info(f"{column} has been appended")
     return np.stack(band_arrays, axis=0)
