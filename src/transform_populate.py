@@ -1,8 +1,6 @@
 from src.helpers import (
     GEOPARQUET_DIR,
     GRID_SIZE,
-    BAND_COLUMN_NAMES,
-    BAND_DTYPES,
 )
 import numpy as np
 import pandas as pd
@@ -13,6 +11,14 @@ from pathlib import Path
 from tqdm import tqdm
 from pyquadkey2.quadkey import QuadKey
 from typing import List
+
+# fit most of the values in 16 or 32 bit integer
+# potentially make separate np.arrays for each band and then just overlay them later
+## we can pick which size of integer for each
+# opt out of user functionality for picking band size or whichever
+# be able to write a single array to the raster and be able to delete the array
+# if done with variable del() command will delete from memory; if no longer using, will delete manually/force delete i.e. geodataframe after loading
+
 
 # Logging
 logging.basicConfig(level=logging.INFO, stream=sys.stdout)
@@ -70,7 +76,7 @@ def create_band_array(
         np.ndarray: 2D array of shape (GRID_SIZE, GRID_SIZE)
     """
     band_array = np.full((GRID_SIZE, GRID_SIZE), 0, dtype=dtype)
-    for idx in range(len(gdf)):  # opted out of tqdm()
+    for idx in tqdm(range(len(gdf))):
         try:
             row = gdf.iloc[idx]
             quadkey = row["quadkey"]
@@ -81,35 +87,3 @@ def create_band_array(
             logger.error(f"Error processing row {idx} for band '{band_column}': {e}")
     logger.info(f"Success loading {band_column} data into array")
     return band_array
-
-
-# fit most of the values in 16 or 32 bit integer
-# potentially make separate np.arrays for each band and then just overlay them later
-## we can pick which size of integer for each
-# opt out of user functionality for picking band size or whichever
-# be able to write a single array to the raster and be able to delete the array
-# if done with variable del() command will delete from memory; if no longer using, will delete manually/force delete i.e. geodataframe after loading
-
-
-def stack_band_arrays(
-    gdf: gpd.GeoDataFrame,
-    band_columns: List[str] = BAND_COLUMN_NAMES,
-    dtype_map: dict = BAND_DTYPES,
-) -> np.ndarray:
-    """
-    Stacks individual band arrays into a 3D array
-    ----
-    Args:
-        gdf (GeoDataFrame): input geospatial data
-        band_columns (List[str]): list of columns to turn into bands
-    Returns:
-        np.ndarray: stacked array of shape (NUM_BAND, GRID_SIZE, GRID_SIZE)
-    """
-    band_arrays = []
-    for column in band_columns:
-        logger.info(f"Creating band for column: {column}")
-        dtype = dtype_map.get(column, np.uint16)
-        band_array = create_band_array(gdf, column, dtype=dtype)
-        band_arrays.append(band_array)
-        logger.info(f"{column} has been appended")
-    return np.stack(band_arrays, axis=0)

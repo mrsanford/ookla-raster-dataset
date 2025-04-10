@@ -8,12 +8,17 @@ from src.helpers import (
     TEST_PARQUET_FILE,
     BAND_COLUMN_NAMES,
     OUTPUT_RASTER_FILE,
+    BAND16_COLS,
+    BAND32_COLS,
 )
-from src.transform_populate import read_parquet, create_band_array, stack_band_arrays
+from src.transform_populate import (
+    read_parquet,
+    create_band_array,
+)
 from src.generate_raster import (
     make_raster_profile,
     write_single_band_raster,
-    write_multiband_raster,
+    write_multiband_raster_chunks,
 )
 
 # Logging setup
@@ -59,17 +64,16 @@ def full_multiband_ookla_pipeline(
     if gdf is None:
         logger.error("GeoDataFrame loading failed. Aborting raster generation.")
         return
-
-    # stacking the band arrays
-    logger.info("Stacking all bands into one raster...")
-    all_bands = stack_band_arrays(gdf, band_columns)
-
-    # creating the raster profile for all the bands
-    profile = make_raster_profile(num_bands=all_bands.shape[0], grid_size=GRID_SIZE)
-
-    # writing all bands into one GeoTIFF
-    write_multiband_raster(all_bands, profile, output_path)
-    logger.info("Multi-band raster pipeline complete.")
+    # writing the profile
+    profile = make_raster_profile(num_bands=5, grid_size=GRID_SIZE)
+    # writing in the bands in increments (the uint32 stacks)
+    write_multiband_raster_chunks(
+        gdf,
+        band32_cols=BAND32_COLS,
+        band16_cols=BAND16_COLS,
+        profile=profile,
+        output_path=OUTPUT_RASTER_FILE,
+    )
 
 
 if __name__ == "__main__":
