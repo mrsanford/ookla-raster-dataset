@@ -75,7 +75,7 @@ def create_band_array(
     Returns:
         np.ndarray: 2D array of shape (GRID_SIZE, GRID_SIZE)
     """
-    band_array = np.full((GRID_SIZE, GRID_SIZE), 0, dtype=dtype)
+    band_array = np.full((GRID_SIZE, GRID_SIZE), np.nan, dtype=dtype)
     for idx in tqdm(range(len(gdf))):
         try:
             row = gdf.iloc[idx]

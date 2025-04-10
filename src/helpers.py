@@ -24,6 +24,13 @@ OUTPUT_RASTER_FILE = os.path.join(
 # Raster Processing Constants
 ZOOM_LEVEL = 16
 GRID_SIZE = 2**ZOOM_LEVEL
+BAND_COLUMN_NAMES = [
+    "avg_lat_ms",
+    "tests",
+    "devices",
+    "avg_d_kbps",
+    "avg_u_kbps",
+]  # ["avg_d_kbps", "avg_u_kbps"]
 BAND32_COLS = ["avg_d_kbps", "avg_u_kbps"]
 BAND16_COLS = ["avg_lat_ms", "tests", "devices"]
 

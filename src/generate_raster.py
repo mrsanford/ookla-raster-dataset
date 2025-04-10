@@ -42,6 +42,7 @@ def make_raster_profile(
         "count": num_bands,
         "dtype": "uint32",
         "crs": CRS.from_epsg(3857),
+        "compress": "lzw",
         "transform": transform,
         "width": grid_size,
         "height": grid_size,
