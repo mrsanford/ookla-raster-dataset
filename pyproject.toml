@@ -12,5 +12,6 @@ dependencies = [
     "pathlib>=1.0.1",
     "pyquadkey2>=0.3.2",
     "rasterio>=1.4.3",
+    "sparse>=0.16.0",
     "tqdm>=4.67.1",
 ]
