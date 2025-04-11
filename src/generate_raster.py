@@ -1,6 +1,6 @@
 from src.helpers import (
     GRID_SIZE,
-    NUM_BAND,
+    NUM_BANDS,
     OUTPUT_RASTER_FILE,
     MAP_BOUNDS,
     BAND16_COLS,
@@ -23,19 +23,22 @@ logger = logging.getLogger(__name__)
 
 
 def make_raster_profile(
-    num_bands: int = NUM_BAND, grid_size: int = GRID_SIZE
+    num_bands: int = NUM_BANDS,
+    grid_size: int = GRID_SIZE,
+    map_bounds: tuple[float, float, float, float] = MAP_BOUNDS,
 ) -> Dict[str, object]:
     """
-    Creates the profile for GeoTIFF raster file, and ensures the
-    raster stretches across entire EPSG:3857 coordinate space
+    Creates the raster metadata profile for writing the GeoTIFF file.
+    Profile includes CRS, transform, and dtype information.
     ---
     Args:
-        grid_size (int): raster grid size (width x height)
-        num_bands (int): number of raster bands
+        grid_size (int): dimensions of the raster grid (width x height)
+        num_bands (int): number of raster bands included in the raster
+        map_bounds (tuple): bounds in projected coordinates
     Returns:
         Dict[str, object]: raster metadata profile
     """
-    left, bottom, right, top = MAP_BOUNDS
+    left, bottom, right, top = map_bounds
     transform = from_bounds(left, bottom, right, top, grid_size, grid_size)
     profile = {
         "driver": "GTiff",
@@ -58,87 +61,44 @@ def write_multiband_raster_chunks(
     band16_cols: List[str] = BAND16_COLS,
 ) -> None:
     """
-    Writes first uint32 bands, then uint16 bands into a 5-band raster.
+    Writes a multiband GeoTIFF raster file from the GeoDataFrame. Completes this
+    one band at a time then deletes in order to maximize computational expense.
+    Each band is created from create_band_array(), converted to dense 2D array,
+    flipped vertically for top-left origin, and written to the output raster file.
+    ---
+    Args:
+        gdf (gpd.GeoDataFrame) is the input GeoDataFrame
+        profile (dict) is the profile outputted from make_raster_profile()
+        output_path (str) the target file path for saving the GeoTIFF
+        band32_cols (List[str]) are the column names for the uint32 bands
+        band16_cols (List[str]) are the column names for the uint16 bands
+    Returns: None
     """
     total_bands = len(band32_cols) + len(band16_cols)
     profile = profile.copy()
     profile["count"] = total_bands
     profile["BIGTIFF"] = "YES"
-    profile["dtype"] = (
-        "uint32"  # NOTE: rasterio needs a single dtype here, we override per band with casting
-    )
+    profile["dtype"] = "uint32"  # this is a placeholder
+
     # Writing the uint32 bands
     with rasterio.open(output_path, "w", **profile) as dst:
         for i, col in enumerate(band32_cols):
             logger.info(f"Writing uint32 band {i + 1}: {col}")
-            band = create_band_array(gdf, col, dtype=np.uint32)
-            band = np.flip(band, axis=0)
-            dst.write(band.astype(np.uint32), i + 1)
-            del band
+            band_sparse = create_band_array(gdf, col, dtype=np.uint32)
+            band_dense = band_sparse.todense()
+            band_dense = np.flip(band_dense, axis=0)
+            dst.write(band_dense.astype(np.uint32), i + 1)
+            del band_sparse, band_dense
             gc.collect()
         # Then writing in the uint16 bands
         for j, col in enumerate(band16_cols):
             band_index = len(band32_cols) + j + 1
             logger.info(f"Writing uint16 band {band_index}: {col}")
-            band = create_band_array(gdf, col, dtype=np.uint16)
-            band = np.flip(band, axis=0)
-            dst.write(band.astype(np.uint16), band_index)
-            del band
+            band_sparse = create_band_array(gdf, col, dtype=np.uint16)
+            band_dense = band_sparse.todense()
+            band_dense = np.flip(band_dense, axis=0)
+            dst.write(band_dense.astype(np.uint16), band_index)
+            del band_sparse, band_dense
             gc.collect()
     logger.info(f"All {total_bands} bands written to {output_path}.")
     return None
-
-
-def write_multiband_raster(
-    all_bands: np.ndarray, profile: dict, output_path: str = OUTPUT_RASTER_FILE
-) -> None:
-    """
-    Writes the mapped 3D numpy array to a single multiband GeoTIFF
-    """
-    try:
-        if all_bands.ndim != 3:
-            logger.warning(
-                f"Expected 3D array (bands, height, width), got {all_bands.shape}"
-            )
-            all_bands = np.expand_dims(all_bands, axis=0)
-        # flips vertically to match geospatial top-left origin
-        all_bands = np.flip(all_bands, axis=1)
-        profile = profile.copy()
-        profile["count"] = all_bands.shape[0]
-        profile["dtype"] = str(all_bands.dtype)
-        profile["BIGTIFF"] = "YES"
-        breakpoint()
-        with rasterio.open(output_path, "w", **profile) as dst:
-            breakpoint()
-            dst.write(all_bands)
-            breakpoint()
-        logger.info(
-            f"Multi-band raster written to {output_path} with shape {all_bands.shape}"
-        )
-    except Exception as e:
-        logger.error(f"Error writing multi-band raster: {e}")
-    return
-
-
-def write_single_band_raster(
-    band_array: np.ndarray, profile: dict, output_path: str = OUTPUT_RASTER_FILE
-) -> None:
-    """
-    Writing single 2D band array to a GeoTIFF
-    """
-    try:
-        if band_array.ndim != 2:
-            logger.error(
-                f"Expected 2D array for single band, got shape {band_array.shape}"
-            )
-            return
-        profile = profile.copy()
-        profile["count"] = 1
-        profile["dtype"] = str(band_array.dtype)
-        profile["BIGTIFF"] = "YES"
-        with rasterio.open(output_path, "w", **profile) as dst:
-            dst.write(band_array, 1)
-        logger.info(f"Single-band raster written to {output_path}")
-    except Exception as e:
-        logger.error(f"Error writing single-band raster: {e}")
-    return

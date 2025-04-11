@@ -1,32 +1,32 @@
-from src.helpers import (
-    GEOPARQUET_DIR,
-    GRID_SIZE,
-)
-import numpy as np
-import pandas as pd
+from src.helpers import GEOPARQUET_DIR, GRID_SIZE
 import geopandas as gpd
+import pandas as pd
+import numpy as np
 import logging
-import sys
 from pathlib import Path
-from tqdm import tqdm
 from pyquadkey2.quadkey import QuadKey
+import sparse
+import sys
+from tqdm import tqdm
 from typing import List
-
-# fit most of the values in 16 or 32 bit integer
-# potentially make separate np.arrays for each band and then just overlay them later
-## we can pick which size of integer for each
-# opt out of user functionality for picking band size or whichever
-# be able to write a single array to the raster and be able to delete the array
-# if done with variable del() command will delete from memory; if no longer using, will delete manually/force delete i.e. geodataframe after loading
-
 
 # Logging
 logging.basicConfig(level=logging.INFO, stream=sys.stdout)
 logger = logging.getLogger(__name__)
 
 
-def iterate_parquet_files() -> List[Path]:
-    return list(GEOPARQUET_DIR.glob("*.parquet"))
+def iterate_parquet_files(geoparquet_dir: str = GEOPARQUET_DIR) -> List[Path]:
+    """
+    Lists all '.parquet' files in specified GEOPARQUET_DIR directory
+    The ultimate goal will be to use them to prepare a list of input files
+    for further processing into raster datasets
+    ---
+    Args:
+        geoparquet_dir (str) is the Path to the directory containing GeoParquet files
+    Returns:
+        List[Path] will be the list of '.parquet' files found
+    """
+    return list(geoparquet_dir.glob("*.parquet"))
 
 
 def read_parquet(parquet_file: str) -> gpd.GeoDataFrame:
@@ -34,8 +34,10 @@ def read_parquet(parquet_file: str) -> gpd.GeoDataFrame:
     Reads the Parquet file and converts the 'tile' column into a geometry column
     and creates a GeoDataFrame
     ----
-    Args: parquet_file (str) is the path to the parquet file
-    Returns: gpd.GeoDataFrame or nothing if the parquet file isn't found
+    Args:
+        parquet_file (str) is the path to the parquet file
+    Returns:
+        gpd.GeoDataFrame or nothing if the parquet file isn't found
     """
     if Path(parquet_file).exists():
         logger.info(f"Reading Parquet file: {parquet_file}")
@@ -49,41 +51,59 @@ def read_parquet(parquet_file: str) -> gpd.GeoDataFrame:
         return None
 
 
-def quadkey_to_tile(quadkey: str) -> tuple[int, int]:
+def quadkey_to_tile(quadkey: str, grid_size: int = GRID_SIZE) -> tuple[int, int]:
     """
     Converts a quadkey to grid coordinates (x,y) adjusted based on GRID_SIZE
     ----
-    Args: quadkey (str) is the quadkey to convert
-    Returns: tuple[int, int] represent the (x,y) coordinates within the grid
+    Args:
+        quadkey (str) is a QuadKey string representing a tile
+        grid_size (int) is the size of the raster grid (width x height)
+    Returns:
+        tuple[int, int] represent the (x,y) coordinates within the grid
     """
     quadkey_obj = QuadKey(quadkey)
     x, y = quadkey_obj.tile
-    x_idx = x % GRID_SIZE
-    y_idx = GRID_SIZE - 1 - (y % GRID_SIZE)
+    x_idx = x % grid_size
+    y_idx = grid_size - 1 - (y % grid_size)
     return x_idx, y_idx
 
 
 def create_band_array(
-    gdf: gpd.GeoDataFrame, band_column: str, dtype=np.float32
-) -> np.ndarray:
+    gdf: gpd.GeoDataFrame,
+    band_column: str,
+    grid_size: int = GRID_SIZE,
+    dtype=np.float32,
+) -> sparse.COO:
     """
-    Creates a single band array for a given column name with respective data from the DataFrame
+    Creates a sparse 2D raster band array from GeoDataFrame using
+    quadkeys, transformed from quadkey_to_tile()
     ----
     Args:
         gdf (GeoDataFrame): input geospatial data
         band_column (str): column name to populate the band
+        grid_size (int): the dimensions of the raster (width x height)
+        dtype (np.dtype): data type of values
     Returns:
-        np.ndarray: 2D array of shape (GRID_SIZE, GRID_SIZE)
+        sparse.COO: 2D array of shape (GRID_SIZE, GRID_SIZE)
     """
-    band_array = np.full((GRID_SIZE, GRID_SIZE), np.nan, dtype=dtype)
+    # lists for coordinates and band array values
+    coords_y = []
+    coords_x = []
+    values = []
+    # looping for the length of the geoDataFrame
     for idx in tqdm(range(len(gdf))):
         try:
             row = gdf.iloc[idx]
             quadkey = row["quadkey"]
             x, y = quadkey_to_tile(quadkey)
             value = row.get(band_column, np.nan)
-            band_array[y, x] = value
+            if not np.isnan(value):
+                coords_y.append(y)
+                coords_x.append(x)
+                values.append(value)
         except Exception as e:
-            logger.error(f"Error processing row {idx} for band '{band_column}': {e}")
-    logger.info(f"Success loading {band_column} data into array")
-    return band_array
+            logger.error(f"Error  processing row {idx} for band '{band_column}': {e} ")
+    coords = [coords_y, coords_x]
+    sparse_array = sparse.COO(coords, values, shape=(grid_size, grid_size))
+    logger.info(f"Successfully created sparse array for band '{band_column}'")
+    return sparse_array
