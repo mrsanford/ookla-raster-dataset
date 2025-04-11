@@ -1,5 +1,4 @@
 import os
-import numpy as np
 
 # Constants
 BUCKET_NAME = "ookla-open-data"
@@ -15,6 +14,8 @@ RASTER_OUTPUT_DIR = os.path.join(BASE_DIR, "visualizations")
 os.makedirs(GEOPARQUET_DIR, exist_ok=True)
 os.makedirs(RASTER_OUTPUT_DIR, exist_ok=True)
 
+# WILL NEED TO DEVELOP EITHER A NAMING CONVENTION OR JUST REPLACING
+## THE TEST_PARQUET_FILE AND OUTPUT_RASTER_FILE FOR FINAL CHANGES
 # Other Constants
 TEST_PARQUET_FILE = "2019-01-01_performance_fixed_tiles.parquet"
 OUTPUT_RASTER_FILE = os.path.join(
@@ -24,17 +25,10 @@ OUTPUT_RASTER_FILE = os.path.join(
 # Raster Processing Constants
 ZOOM_LEVEL = 16
 GRID_SIZE = 2**ZOOM_LEVEL
-BAND_COLUMN_NAMES = [
-    "avg_lat_ms",
-    "tests",
-    "devices",
-    "avg_d_kbps",
-    "avg_u_kbps",
-]  # ["avg_d_kbps", "avg_u_kbps"]
 BAND32_COLS = ["avg_d_kbps", "avg_u_kbps"]
 BAND16_COLS = ["avg_lat_ms", "tests", "devices"]
+NUM_BANDS = 5
 
-NUM_BAND = 5
 # For EPSG 3857
 MAP_BOUNDS = (
     -20037508.342789244,
