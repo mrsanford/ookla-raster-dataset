@@ -17,7 +17,7 @@ os.makedirs(RASTER_OUTPUT_DIR, exist_ok=True)
 # WILL NEED TO DEVELOP EITHER A NAMING CONVENTION OR JUST REPLACING
 ## THE TEST_PARQUET_FILE AND OUTPUT_RASTER_FILE FOR FINAL CHANGES
 # Other Constants
-TEST_PARQUET_FILE = "2019-01-01_performance_fixed_tiles.parquet"
+TEST_PARQUET_FILE = "2019-04-01_performance_fixed_tiles.parquet"
 OUTPUT_RASTER_FILE = os.path.join(
     RASTER_OUTPUT_DIR, TEST_PARQUET_FILE.replace(".parquet", ".tif")
 )

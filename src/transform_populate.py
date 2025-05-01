@@ -3,30 +3,27 @@ import geopandas as gpd
 import pandas as pd
 import numpy as np
 import logging
-from pathlib import Path
 from pyquadkey2.quadkey import QuadKey
-import sparse
+from scipy.sparse import coo_matrix
 import sys
+import os
 from tqdm import tqdm
-from typing import List
 
 # Logging
 logging.basicConfig(level=logging.INFO, stream=sys.stdout)
 logger = logging.getLogger(__name__)
 
 
-def iterate_parquet_files(geoparquet_dir: str = GEOPARQUET_DIR) -> List[Path]:
-    """
-    Lists all '.parquet' files in specified GEOPARQUET_DIR directory
-    The ultimate goal will be to use them to prepare a list of input files
-    for further processing into raster datasets
-    ---
-    Args:
-        geoparquet_dir (str) is the Path to the directory containing GeoParquet files
-    Returns:
-        List[Path] will be the list of '.parquet' files found
-    """
-    return list(geoparquet_dir.glob("*.parquet"))
+# def iterate_parquet_files(geoparquet_dir: str = GEOPARQUET_DIR) -> List[Path]:
+#     """
+#     Returns a list of all '*.parquet' file paths in the specified GEOPARQUET_DIR
+#     ---
+#     Args:
+#         geoparquet_dir (str) is the Path to the directory containing GeoParquet files
+#     Returns:
+#         List[Path] will be the list of '.parquet' files found
+#     """
+#     return [str(p) for p in geoparquet_dir.glob("*.parquet")]
 
 
 def read_parquet(parquet_file: str) -> gpd.GeoDataFrame:
@@ -39,12 +36,12 @@ def read_parquet(parquet_file: str) -> gpd.GeoDataFrame:
     Returns:
         gpd.GeoDataFrame or nothing if the parquet file isn't found
     """
-    if Path(parquet_file).exists():
+    if os.path.exists(parquet_file):
         logger.info(f"Reading Parquet file: {parquet_file}")
         parquet_data = pd.read_parquet(parquet_file)
         parquet_data["geometry"] = gpd.GeoSeries.from_wkt(parquet_data["tile"])
         gdf = gpd.GeoDataFrame(parquet_data)
-        logger.info(gdf.head())
+        # logger.info(gdf.head()) # Checking the geoDataFrame
         return gdf
     else:
         logger.warning(f"Parquet file not found: {parquet_file}")
@@ -73,7 +70,7 @@ def create_band_array(
     band_column: str,
     grid_size: int = GRID_SIZE,
     dtype=np.float32,
-) -> sparse.COO:
+) -> coo_matrix:
     """
     Creates a sparse 2D raster band array from GeoDataFrame using
     quadkeys, transformed from quadkey_to_tile()
@@ -103,7 +100,10 @@ def create_band_array(
                 values.append(value)
         except Exception as e:
             logger.error(f"Error  processing row {idx} for band '{band_column}': {e} ")
-    coords = [coords_y, coords_x]
-    sparse_array = sparse.COO(coords, values, shape=(grid_size, grid_size))
+    sparse_array = coo_matrix(
+        (values, (coords_y, coords_x)),
+        shape=(grid_size, grid_size),
+        dtype=dtype
+    )
     logger.info(f"Successfully created sparse array for band '{band_column}'")
     return sparse_array

@@ -13,18 +13,18 @@ logging.getLogger("botocore").setLevel(
     logging.WARNING
 )  # Suppress botocore checksum spam
 
-# making the directory
+# Making the directory
 os.makedirs(GEOPARQUET_DIR, exist_ok=True)
 
 
-# creating the s3 client with anonymous token
+# Creating the s3 client with anonymous token
 def create_s3_client() -> BaseClient:
     return boto3.client(
         "s3", region_name=REGION_NAME, config=Config(signature_version=UNSIGNED)
     )
 
 
-# creating the download file function and creating the loggers
+# Creating the download file function and creating the loggers
 def prepare_download(s3_client: BaseClient, s3_key: str) -> None:
     filename = os.path.basename(s3_key)
     local_file_path = os.path.join(GEOPARQUET_DIR, filename)
@@ -39,7 +39,7 @@ def prepare_download(s3_client: BaseClient, s3_key: str) -> None:
         logger.error(f"Error downloading s3://{BUCKET_NAME}/{s3_key}: {e}")
 
 
-# doing the actual donwloading; calling the S3 client, and putting the S3 filenames together
+# Doing the actual donwloading; calling the S3 client, and putting the S3 filenames together
 def download_files() -> None:
     """
     Downloads the performance data files from the Ookla S3 bucket to a local directory
