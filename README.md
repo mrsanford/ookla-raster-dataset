@@ -1,5 +1,3 @@
-# ookla-raster-dataset
-
 ## Background
 The Ookla Speedtest dataset (aka *Global Fixed and Mobile Network Performance Maps*) comes from speedtest.net, which is a tool that allows used to measure internet connection speeds. Ookla has collected global data regarding internet performance including download/upload speeds (mbps), latency (ms), the number of tests and devices, and the download/upload loaded latency speeds (ms). The dataset is valuable in analyzing internet infrastructure and performance trends around the world; moreover, it is beneficial in potentially visualizing disparities by region.
 
