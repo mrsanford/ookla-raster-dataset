@@ -1,18 +1,15 @@
-from src.helpers import GEOPARQUET_DIR, GRID_SIZE
 import geopandas as gpd
 import pandas as pd
 import numpy as np
-import logging
+from pathlib import Path
+from tqdm import tqdm
 from pyquadkey2.quadkey import QuadKey
 from scipy.sparse import coo_matrix
-import sys
-import os
-from tqdm import tqdm
+from utils.helpers import GRID_SIZE
+from utils.loggers import setup_custom_logger
 
-# Logging
-logging.basicConfig(level=logging.INFO, stream=sys.stdout)
-logger = logging.getLogger(__name__)
 
+logger = setup_custom_logger("TRANSFORM")
 
 # def iterate_parquet_files(geoparquet_dir: str = GEOPARQUET_DIR) -> List[Path]:
 #     """
@@ -26,7 +23,7 @@ logger = logging.getLogger(__name__)
 #     return [str(p) for p in geoparquet_dir.glob("*.parquet")]
 
 
-def read_parquet(parquet_file: str) -> gpd.GeoDataFrame:
+def read_parquet(parquet_file: Path | str) -> gpd.GeoDataFrame:
     """
     Reads the Parquet file and converts the 'tile' column into a geometry column
     and creates a GeoDataFrame
@@ -36,16 +33,26 @@ def read_parquet(parquet_file: str) -> gpd.GeoDataFrame:
     Returns:
         gpd.GeoDataFrame or nothing if the parquet file isn't found
     """
-    if os.path.exists(parquet_file):
-        logger.info(f"Reading Parquet file: {parquet_file}")
-        parquet_data = pd.read_parquet(parquet_file)
-        parquet_data["geometry"] = gpd.GeoSeries.from_wkt(parquet_data["tile"])
-        gdf = gpd.GeoDataFrame(parquet_data)
-        # logger.info(gdf.head()) # Checking the geoDataFrame
+    parquet_file = Path(parquet_file)
+    if parquet_file.exists():
+        logger.info(f"Reading Parquet file: {parquet_file.name}")
+        p_df = pd.read_parquet(parquet_file)
+        p_df["geometry"] = gpd.GeoSeries.from_wkt(p_df["tile"])
+        gdf = gpd.GeoDataFrame(p_df)
         return gdf
     else:
         logger.warning(f"Parquet file not found: {parquet_file}")
         return None
+    # if os.path.exists(parquet_file):
+    #     logger.info(f"Reading Parquet file: {parquet_file}")
+    #     parquet_data = pd.read_parquet(parquet_file)
+    #     parquet_data["geometry"] = gpd.GeoSeries.from_wkt(parquet_data["tile"])
+    #     gdf = gpd.GeoDataFrame(parquet_data)
+    #     # logger.info(gdf.head()) # Checking the geoDataFrame
+    #     return gdf
+    # else:
+    #     logger.warning(f"Parquet file not found: {parquet_file}")
+    #     return None
 
 
 def quadkey_to_tile(quadkey: str, grid_size: int = GRID_SIZE) -> tuple[int, int]:
@@ -81,7 +88,7 @@ def create_band_array(
         grid_size (int): the dimensions of the raster (width x height)
         dtype (np.dtype): data type of values
     Returns:
-        sparse.COO: 2D array of shape (GRID_SIZE, GRID_SIZE)
+        coo_matrix: 2D array of shape (GRID_SIZE, GRID_SIZE)
     """
     # lists for coordinates and band array values
     coords_y = []
@@ -101,9 +108,7 @@ def create_band_array(
         except Exception as e:
             logger.error(f"Error  processing row {idx} for band '{band_column}': {e} ")
     sparse_array = coo_matrix(
-        (values, (coords_y, coords_x)),
-        shape=(grid_size, grid_size),
-        dtype=dtype
+        (values, (coords_y, coords_x)), shape=(grid_size, grid_size), dtype=dtype
     )
     logger.info(f"Successfully created sparse array for band '{band_column}'")
     return sparse_array

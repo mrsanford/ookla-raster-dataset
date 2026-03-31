@@ -1,25 +1,21 @@
-from src.helpers import (
-    GRID_SIZE,
-    NUM_BANDS,
-    OUTPUT_RASTER_FILE,
-    MAP_BOUNDS,
-    BAND16_COLS,
-    BAND32_COLS,
-)
-from src.transform_populate import create_band_array
+from transform_populate import create_band_array
 from rasterio.transform import from_bounds
 from rasterio.crs import CRS
 import rasterio
 import geopandas as gpd
 import numpy as np
-import logging
-import sys
 import gc
 from typing import Dict, List
+from utils.helpers import (
+    GRID_SIZE,
+    NUM_BANDS,
+    MAP_BOUNDS,
+    BAND16_COLS,
+    BAND32_COLS,
+)
+from utils.loggers import setup_custom_logger
 
-# instantiating the logging
-logging.basicConfig(level=logging.INFO, stream=sys.stdout)
-logger = logging.getLogger(__name__)
+logger = setup_custom_logger("RASTERIZE")
 
 
 def make_raster_profile(
@@ -56,7 +52,7 @@ def make_raster_profile(
 def write_multiband_raster_chunks(
     gdf: gpd.GeoDataFrame,
     profile: dict,
-    output_path: str = OUTPUT_RASTER_FILE,
+    output_path: str,
     band32_cols: List[str] = BAND32_COLS,
     band16_cols: List[str] = BAND16_COLS,
 ) -> None:
@@ -79,8 +75,7 @@ def write_multiband_raster_chunks(
     profile["count"] = total_bands
     profile["BIGTIFF"] = "YES"
     profile["dtype"] = "uint32"  # this is a placeholder
-
-    # Writing the uint32 bands
+    # Write into the uint32 bands
     with rasterio.open(output_path, "w", **profile) as dst:
         for i, col in enumerate(band32_cols):
             logger.info(f"Writing uint32 band {i + 1}: {col}")
@@ -90,7 +85,7 @@ def write_multiband_raster_chunks(
             dst.write(band_dense.astype(np.uint32), i + 1)
             del band_sparse, band_dense
             gc.collect()
-        # Then writing in the uint16 bands
+        # Write into the uint16 bands
         for j, col in enumerate(band16_cols):
             band_index = len(band32_cols) + j + 1
             logger.info(f"Writing uint16 band {band_index}: {col}")

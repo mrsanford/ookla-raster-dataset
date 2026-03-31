@@ -1,11 +1,8 @@
 import geopandas as gpd
-import os
-import logging
-import sys
+from pathlib import Path
+from utils.loggers import setup_custom_logger
 
-# instantiating the logging
-logging.basicConfig(level=logging.INFO, stream=sys.stdout)
-logger = logging.getLogger(__name__)
+logger = setup_custom_logger("GEOPACKAGE")
 
 
 def make_geopackage(gdf: gpd.GeoDataFrame, output_path: str):
@@ -15,12 +12,11 @@ def make_geopackage(gdf: gpd.GeoDataFrame, output_path: str):
     and is just an option for additional visualization functionality
     """
     try:
+        out_path = Path(output_path)
         if gdf is not None and isinstance(gdf, gpd.GeoDataFrame):
-            output_dir = os.path.dirname(output_path)
-            if not os.path.exists(output_dir):
-                os.makedirs(output_dir)
-            gdf.to_file(output_path, driver="GPKG")
-            logger.info(f"Saved data as GeoPackage: {output_path}")
+            out_path.parent.mkdir(parents=True, exist_ok=True)
+            gdf.to_file(out_path, driver="GPKG")
+            logger.info(f"Saved data as GeoPackage: {out_path}")
         else:
             logger.warning("Invalid GeoDataFrame provided to make_geopackage.")
     except Exception as e:
