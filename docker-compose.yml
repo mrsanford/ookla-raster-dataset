@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  ookla-processor:
+    build: .
+    container_name: ookla_pipeline_run
+    volumes:
+      # Format: [Host Path]:[Container Path]
+      - ./data:/app/data
+      - ./visualizations:/app/visualizations
+      - ./logs:/app/logs
+    command: python3 main.py
+    # Optional
+    deploy:
+      resources:
+        limits:
+          memory: 4G
