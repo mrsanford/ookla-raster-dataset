@@ -1,18 +1,23 @@
-FROM ghcr.io/osgeo/gdal:ubuntu-small-latest
+FROM ghcr.io/astral-sh/uv:debian
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y \
-    python3-pip \
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gdal-bin \
+    libgdal-dev \
     python3-dev \
+    gcc \
+    g++ \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
+COPY pyproject.toml uv.lock .python-version* ./
 
-RUN pip3 install --no-cache-dir -r requirements.txt
+RUN uv sync --frozen --no-dev --no-install-project
 
 COPY . .
 
 RUN mkdir -p data/datasets visualizations logs
 
-CMD ["python3", "run.py"]
+ENV PATH="/app/.venv/bin:$PATH"
+
+CMD ["python", "run.py"]
